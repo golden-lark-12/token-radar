@@ -3,12 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar: pre-token protocols ranked by implied value</title>
+<title>Token Radar — pre-token protocols ranked by implied value</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<main id="board" tabindex="-1" aria-busy="true"></main>
+<a class="skip" href="#board-wrap">Skip to the board</a>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><span class="brand-name">Token Radar</span></div>
+    <div class="top-meta">
+      <span>Snapshot <b id="snap-date">—</b></span>
+      <span>Model <b id="model-ver">—</b></span>
+      <span id="source-note">DefiLlama protocol index</span>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="kpis" aria-label="Coverage and model fit">
+      <div class="kpi">
+        <span class="kpi-label">Watchlist covered</span>
+        <b class="kpi-value" id="kpi-watchlist">—</b>
+        <span class="kpi-sub">of the 40-protocol watchlist</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Board rows</span>
+        <b class="kpi-value" id="kpi-board">—</b>
+        <span class="kpi-sub">pre-token protocols ranked</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Live-token comps</span>
+        <b class="kpi-value" id="kpi-live">—</b>
+        <span class="kpi-sub">market-cap-live, used for the fit</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Median fitted multiple</span>
+        <b class="kpi-value" id="kpi-median">—</b>
+        <span class="kpi-sub">mcap / TVL, shrunk to the median</span>
+      </div>
+      <div class="kpi kpi-warn">
+        <span class="kpi-label">Held-out MedAPE</span>
+        <b class="kpi-value" id="kpi-medape">—</b>
+        <span class="kpi-sub">median absolute % error, held-out</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Baseline MedAPE</span>
+        <b class="kpi-value" id="kpi-baseline">—</b>
+        <span class="kpi-sub">overall-median baseline, held-out</span>
+      </div>
+    </section>
+
+    <p class="lede">Each protocol is scored from its own snapshot figures: TVL times a multiple
+    fitted to live-token comparables in its category, adjusted for seven-day growth and the odds it
+    ever launches a token. The fit was validated on a held-out split of live tokens. Implied value is
+    a model, not a promise — it ranks, it does not price.</p>
+
+    <section class="controls" aria-label="Board controls">
+      <div class="field">
+        <label for="q">Search</label>
+        <input type="search" id="q" placeholder="Name, slug, category or chain" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="cat">Category</label>
+        <select id="cat"><option value="all">All categories</option></select>
+      </div>
+      <div class="field">
+        <label for="chain">Chain</label>
+        <select id="chain"><option value="all">All chains</option></select>
+      </div>
+      <div class="field">
+        <label for="odds">Token odds</label>
+        <select id="odds">
+          <option value="0">Any</option>
+          <option value="0.25">&gt;= 25%</option>
+          <option value="0.5">&gt;= 50%</option>
+          <option value="0.75">&gt;= 75%</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="verdict">Verdict</label>
+        <select id="verdict">
+          <option value="all">All</option>
+          <option value="farm">farm</option>
+          <option value="thin">thin</option>
+          <option value="skip">skip</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="field-label" id="tab-label">Token status</span>
+        <div class="tabs" role="group" aria-labelledby="tab-label">
+          <button type="button" id="tab-pre" aria-pressed="true">Pre-token</button>
+          <button type="button" id="tab-live" aria-pressed="false">Live token</button>
+        </div>
+      </div>
+      <span class="count" id="count" aria-live="polite"></span>
+    </section>
+
+    <div id="board-wrap" tabindex="-1"></div>
+
+    <section class="panel model" aria-labelledby="model-title">
+      <h2 id="model-title">How implied value is computed</h2>
+      <p class="sub">One function scores every row. No protocol name is special-cased, and no row
+      is hand-picked. Age is not in the formula: it shows no trend in the multiple, so the maturity
+      factor is flat at 1.0.</p>
+      <div class="formula">implied = TVL x fitted_multiple(category) x growth x token_odds
+growth = 1 + 0.01 x clip(change_7d, -30, +30)
+token_odds = clip(category token rate x TVL-band ratio x age-band ratio, 0.05, 0.95)</div>
+      <h3>Fitted multiples by category</h3>
+      <p class="sub">Fitted mcap / TVL multiples, shrunk toward the global positive median 0.214
+      and capped at 2.0. Categories with no live comparables use 0.214.</p>
+      <div class="table-wrap">
+        <table class="multiples">
+          <thead><tr><th scope="col">Category</th><th scope="col">Fitted multiple</th></tr></thead>
+          <tbody id="multiples-body"></tbody>
+        </table>
+      </div>
+      <h3>Held-out validation</h3>
+      <p>Held-out validation on the 144 market-cap-live protocols, 80/20 split, 5 seeds — median
+      absolute percentage error 90–125% (seed 42: 98.8%). The category fit barely beats the
+      overall-median baseline (MedAPE 87–99%). This model ranks, it does not price — implied values
+      are order-of-magnitude scores with ~2x typical error.</p>
+    </section>
+  </main>
+</div>
+
+<dialog id="detail" class="detail" aria-labelledby="detail-title"></dialog>
+
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
