@@ -553,7 +553,9 @@ export interface EverOdds {
  * age (5.07 years, the snapshot's oldest cohort), with the row's own
  * TVL, growth and family. ever = (pMax - p(age)) / (1 - p(age)):
  * among peers still tokenless at this age, the share that ever records
- * one by the ceiling. 12-month odds use p(age + 1 year) the same way.
+ * one by the ceiling. 12-month odds use p(age + 1 year) the same way,
+ * with the age clamped to the ceiling: past the ceiling there is no
+ * further year to wait, so 12-month odds can never exceed ever-odds.
  * Floored and capped at 0.05 / 0.95, as the shipped odds were.
  */
 export function everOdds(beta: number[], p: SnapProto, age: number | null, m: Consts = MODEL, isKid = false): EverOdds {
@@ -562,7 +564,7 @@ export function everOdds(beta: number[], p: SnapProto, age: number | null, m: Co
   const logit = beta.reduce((s, b, j) => s + b * x[j]!, 0);
   const pAge = logistic(logit);
   const pMax = oddsPAt(beta, p, m.odds_ceiling_years, isKid);
-  const pNext = oddsPAt(beta, p, ageYears + 1, isKid);
+  const pNext = oddsPAt(beta, p, Math.min(ageYears + 1, m.odds_ceiling_years), isKid);
   const rawEver = pAge >= 1 ? 0 : (pMax - pAge) / (1 - pAge);
   const rawTwelve = pAge >= 1 ? 0 : (pNext - pAge) / (1 - pAge);
   const ever = Math.min(m.odds_cap, Math.max(m.odds_floor, rawEver));
