@@ -68,16 +68,20 @@
 //   never be FARM (capped at thin); down 30% or more is SKIP, whatever the odds say.
 //   The guard's reason is shown on the row ("TVL -72.7% in 7d").
 //
-//   NET — information, NOT the verdict. Slice = implied x 7% x ($1,000 / TVL); gas is the
+//   NET — and the verdict. Slice = implied x 7% x ($1,000 / TVL); gas is the
 //   chain's farm-run gas; forgone yield = $1,000 x 4% x (hold_days / 365). Net = slice -
 //   gas - forgone yield. Net/hour divides by the farm plan's time (0.25h setup + 10 min a
 //   week over the hold + 10 min to claim). Break-even ticket is the ticket size at which
 //   the net is $0 (null when the slice per dollar is below the T-bill rate, so no ticket
 //   pays); break-even odds is the token odds needed for a $1,000 ticket to break even
-//   (null when above 0.95). The verdict stays ODDS-BASED (v1's direction): farm if odds
-//   >= 0.5, thin if >= 0.3, else skip — then the crash guard caps it. A negative net
-//   never flips a farm to a skip. Top rows may be SKIP with a negative net: that is what
-//   the odds say, and the board shows the farm plan for the row, not the net.
+//   (null when above 0.95). The verdict is odds AND money: farm only when the odds are
+//   >= 0.5 AND the net at the plan size is positive; thin when the odds are >= 0.3,
+//   else skip — then the crash guard caps it. The plan size IS the ticket: every farm
+//   plan deposits $1,000, the same ticket the net is computed at, so the plan and the
+//   verdict use one size and a FARM badge never sits beside a negative net. A negative
+//   net never flips a thin to a skip, and a positive net never lifts a thin to a farm
+//   on its own. Top rows may be SKIP with a negative net: that is what the odds say,
+//   and the board shows the farm plan for the row, not the net.
 
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
 export interface SnapshotProtocol {
@@ -316,7 +320,8 @@ export interface FarmStep {
 
 /** The net of farming one protocol on the default ticket: slice, gas, forgone T-bill
  *  yield, net, net per hour, and the two break-evens (null when no ticket / no odds
- *  below 0.95 pays). The net is information; the verdict is odds-based. */
+ *  below 0.95 pays). The net is one half of the verdict: farm needs odds >= 0.5 AND
+ *  a positive net at the plan size (see verdictFor). */
 export interface NetInfo {
   hold_days: number;
   hours: number;
@@ -829,11 +834,12 @@ export interface BoardSummary {
   live_size: number;
 }
 
-/** The verdict for a row: farm when the token odds are strong, thin when they are middling,
- *  skip when they are weak. The verdict is about the probability of a token, not the size:
- *  the net is shown as a column but never flips it. */
-export function verdictFor(odds: number): 'farm' | 'thin' | 'skip' {
-  if (odds >= 0.5) return 'farm';
+/** The verdict for a row: farm when the token odds are strong AND the net at the plan
+ *  size is positive, thin when the odds are middling, skip when they are weak. A
+ *  FARM badge never sits beside a negative net: odds alone cannot farm a row that
+ *  loses money at the $1,000 ticket. */
+export function verdictFor(odds: number, netUsd: number): 'farm' | 'thin' | 'skip' {
+  if (odds >= 0.5 && netUsd > 0) return 'farm';
   if (odds >= 0.3) return 'thin';
   return 'skip';
 }
@@ -1027,7 +1033,7 @@ export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): B
     // The crash guard caps the verdict, never the value: a protocol down 15% or more
     // in 7 days can never be FARM; down 30% or more is SKIP, whatever the odds say.
     const g7 = s.p.change_7d;
-    let verdict = verdictFor(s.odds);
+    let verdict = verdictFor(s.odds, s.net.net_usd);
     let guard: string | null = null;
     if (g7 !== null && g7 <= -30) {
       verdict = 'skip';
@@ -1107,12 +1113,11 @@ function chainOf(p: SnapshotProtocol): string {
   return p.chains.length > 0 ? p.chains[0]! : 'its main chain';
 }
 
-/** How much capital one farm position needs, from the protocol's own TVL. */
+/** How much capital one farm position needs: the ticket the net is computed at,
+ *  $1,000, for every row. The plan and the verdict use one size, so the deposit the
+ *  plan states is the ticket the net (and the FARM rule) is judged at. */
 export function capitalFor(p: SnapshotProtocol): number {
-  if (p.tvl_usd >= 5_000_000_000) return 250;
-  if (p.tvl_usd >= 1_000_000_000) return 150;
-  if (p.tvl_usd >= 100_000_000) return 100;
-  return 50;
+  return MODEL.ticket_usd;
 }
 
 /** Gas for a full farm run (setup + weekly actions + claim), from the chain's typical fees. */
@@ -1123,10 +1128,12 @@ export function gasFor(p: SnapshotProtocol): number {
   return 15;
 }
 
-/** The context a farm plan is written from: the protocol's own record. */
+/** The context a farm plan is written from: the protocol's own record. `cap` is the
+ *  plan size as written ($1,000), the same ticket the net is computed at. */
 interface PlanCtx {
   name: string;
   capital: number;
+  cap: string;
   chain: string;
   gas: number;
   hold: number;
@@ -1147,7 +1154,7 @@ function walletStep(): FarmStep {
 function holdStep(ctx: PlanCtx): FarmStep {
   return {
     text: `Hold your ${ctx.name} position on ${ctx.chain} for at least ${ctx.hold} days so the activity is counted in more than one snapshot.`,
-    cost: `the $${ctx.capital} stays in the position`,
+    cost: `the ${ctx.cap} stays in the position`,
     time: `${ctx.hold} days`,
   };
 }
@@ -1174,7 +1181,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
     steps: (ctx) => {
       const borrow = Math.max(10, Math.round(ctx.capital / 3));
       return [
-        { text: `Supply $${ctx.capital} of USDC to ${ctx.name} on ${ctx.chain} as collateral and keep the loan-to-value below 50%.`, cost: `$${ctx.capital} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+        { text: `Supply ${ctx.cap} of USDC to ${ctx.name} on ${ctx.chain} as collateral and keep the loan-to-value below 50%.`, cost: `${ctx.cap} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
         { text: `Borrow $${borrow} of the chain's stablecoin against your ${ctx.name} collateral and hold it in the same wallet, so the position counts as active borrowing.`, cost: `$${borrow} borrowed, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '10 minutes' },
         { text: `Top up the collateral or repay a small part of the borrow on ${ctx.name} once a week, so the position shows fresh activity in every snapshot.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       ];
@@ -1183,7 +1190,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('dex') || c.includes('liquidity manager') || c.includes('leveraged farm') || c.includes('farm'),
     steps: (ctx) => [
-      { text: `Provide $${ctx.capital} of liquidity to ${ctx.name}'s main pool on ${ctx.chain}, in the pair the app suggests, and keep the position open.`, cost: `$${ctx.capital} of liquidity, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Provide ${ctx.cap} of liquidity to ${ctx.name}'s main pool on ${ctx.chain}, in the pair the app suggests, and keep the position open.`, cost: `${ctx.cap} of liquidity, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `If ${ctx.name} offers a gauge or a farm for that pool, stake the LP receipt there so the deposit earns the protocol's own rewards.`, cost: 'about $2 of gas to stake', time: '10 minutes' },
       { text: `Swap a small amount through ${ctx.name} on ${ctx.chain} once a week, so the wallet shows trading activity as well as liquidity.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: `Rebalance your ${ctx.name} position when the price moves out of range, and add the earned fees back into the pool.`, cost: 'about $2 of gas when you rebalance', time: '10 minutes when you rebalance' },
@@ -1192,7 +1199,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('yield'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} of USDC into ${ctx.name}'s highest-yield strategy on ${ctx.chain} and keep the receipt token.`, cost: `$${ctx.capital} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} of USDC into ${ctx.name}'s highest-yield strategy on ${ctx.chain} and keep the receipt token.`, cost: `${ctx.cap} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `If ${ctx.name} lets you pick a strategy, choose the one that has run the longest and shows a public track record.`, cost: 'no extra capital', time: '10 minutes to compare' },
       { text: `Claim ${ctx.name}'s strategy yield once a week and redeposit it, so the position compounds and the wallet stays active.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
@@ -1200,7 +1207,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('curator') || c.includes('allocator'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} into a ${ctx.name} vault on ${ctx.chain} and keep the vault shares in the farming wallet.`, cost: `$${ctx.capital} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} into a ${ctx.name} vault on ${ctx.chain} and keep the vault shares in the farming wallet.`, cost: `${ctx.cap} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Read ${ctx.name}'s vault curator page and note which markets it allocates to, so you can answer for the position later.`, cost: 'no extra capital', time: '10 minutes to read' },
       { text: `Add a small top-up into the same ${ctx.name} vault once a week, so the deposit shows fresh activity.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
@@ -1208,14 +1215,14 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('rwa') || c.includes('stable') || c.includes('reserve currency'),
     steps: (ctx) => [
-      { text: `Mint $${ctx.capital} of ${ctx.name}'s yield-bearing asset on ${ctx.chain} and hold it in the farming wallet.`, cost: `$${ctx.capital} to mint, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Mint ${ctx.cap} of ${ctx.name}'s yield-bearing asset on ${ctx.chain} and hold it in the farming wallet.`, cost: `${ctx.cap} to mint, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} asset's backing page once a week and keep a note of the yield it has paid.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('basis') || c.includes('derivative') || c.includes('perpetual') || c.includes('options') || c.includes('synthetic') || c.includes('interest rate'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} of USDC as margin on ${ctx.name} and open one small hedge, no more than a tenth of the deposit.`, cost: `$${ctx.capital} of margin, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} of USDC as margin on ${ctx.name} and open one small hedge, no more than a tenth of the deposit.`, cost: `${ctx.cap} of margin, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Set a stop on the ${ctx.name} hedge so a sharp move cannot liquidate the margin.`, cost: 'no extra capital', time: '5 minutes' },
       { text: `Roll or close the ${ctx.name} hedge once a week and open a fresh one, so the account shows regular trading.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: `Keep the rest of the margin uninvested in ${ctx.name}, so the position survives a volatile week.`, cost: 'no extra capital', time: 'no extra time' },
@@ -1225,13 +1232,13 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
     match: (c) => c.includes('chain') || c.includes('ai agent') || c.includes('decentralized ai'),
     steps: (ctx) => [
       { text: `Use ${ctx.name} on ${ctx.chain}: run one transaction a week from the farming wallet and keep it active.`, cost: `about $${Math.max(2, Math.round(ctx.gas / 4))} of gas a week`, time: '10 minutes a week' },
-      { text: `Try ${ctx.name}'s main app once, with a small amount, so the wallet has a real interaction on record.`, cost: `about $${Math.max(10, Math.round(ctx.capital / 10))} for the trial`, time: '15 minutes' },
+      { text: `Try ${ctx.name}'s main app once, with ${ctx.cap}, so the wallet has a real interaction on record.`, cost: `about ${ctx.cap} for the trial`, time: '15 minutes' },
     ],
   },
   {
     match: (c) => c.includes('prediction'),
     steps: (ctx) => [
-      { text: `Fund $${ctx.capital} on ${ctx.name} and place one market position on ${ctx.chain}, on a market you have read.`, cost: `$${ctx.capital} to fund, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Fund ${ctx.cap} on ${ctx.name} and place one market position on ${ctx.chain}, on a market you have read.`, cost: `${ctx.cap} to fund, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Close or settle the ${ctx.name} position when the market resolves, and place a fresh one the next week.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: `Keep the ${ctx.name} stake small and the position count steady, so the activity reads as regular use.`, cost: 'no extra capital', time: 'no extra time' },
     ],
@@ -1239,14 +1246,14 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('bridge'),
     steps: (ctx) => [
-      { text: `Bridge $${ctx.capital} of USDC to ${ctx.chain} through ${ctx.name} and use the bridged funds in the destination app.`, cost: `$${ctx.capital} to bridge, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Bridge ${ctx.cap} of USDC to ${ctx.chain} through ${ctx.name} and use the bridged funds in the destination app.`, cost: `${ctx.cap} to bridge, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Bridge a small amount back through ${ctx.name} once a week, so the route shows two-way activity.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('launchpad'),
     steps: (ctx) => [
-      { text: `Join ${ctx.name}'s next launch on ${ctx.chain} with $${ctx.capital}, and read the launch terms before you commit.`, cost: `$${ctx.capital} to join, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Join ${ctx.name}'s next launch on ${ctx.chain} with ${ctx.cap}, and read the launch terms before you commit.`, cost: `${ctx.cap} to join, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `If ${ctx.name}'s launch asks for a stake or a hold, keep the required balance in the farming wallet.`, cost: 'no extra capital', time: '10 minutes to check' },
       { text: `Claim the allocation from ${ctx.name}'s own page when it opens, and never pay a third party to claim it.`, cost: 'no fee to check', time: '10 minutes when it opens' },
     ],
@@ -1254,21 +1261,21 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('index'),
     steps: (ctx) => [
-      { text: `Buy $${ctx.capital} of the ${ctx.name} index on ${ctx.chain} and hold the index token in the farming wallet.`, cost: `$${ctx.capital} to buy, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Buy ${ctx.cap} of the ${ctx.name} index on ${ctx.chain} and hold the index token in the farming wallet.`, cost: `${ctx.cap} to buy, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} index composition once a week and note any rebalance.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('payment') || c.includes('card issuer'),
     steps: (ctx) => [
-      { text: `Spend $${ctx.capital} through ${ctx.name} on ${ctx.chain} for a real purchase, and keep the receipt.`, cost: `$${ctx.capital} to spend, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Spend ${ctx.cap} through ${ctx.name} on ${ctx.chain} for a real purchase, and keep the receipt.`, cost: `${ctx.cap} to spend, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Use the ${ctx.name} payment route once a week for a small amount, so the account shows regular use.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('privacy'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} into ${ctx.name}'s private pool on ${ctx.chain} and keep the withdrawal note safe.`, cost: `$${ctx.capital} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} into ${ctx.name}'s private pool on ${ctx.chain} and keep the withdrawal note safe.`, cost: `${ctx.cap} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Withdraw a small amount once a week and redeposit it, so the pool sees regular activity.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: `Never share the ${ctx.name} withdrawal note or the pool link with anyone.`, cost: 'no extra capital', time: 'no extra time' },
     ],
@@ -1276,14 +1283,14 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('insurance'),
     steps: (ctx) => [
-      { text: `Buy $${ctx.capital} of cover from ${ctx.name} on ${ctx.chain} and keep the policy in the farming wallet.`, cost: `$${ctx.capital} for cover, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Buy ${ctx.cap} of cover from ${ctx.name} on ${ctx.chain} and keep the policy in the farming wallet.`, cost: `${ctx.cap} for cover, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} policy once a week and note the cover period.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('staking') || c.includes('restak'),
     steps: (ctx) => [
-      { text: `Stake $${ctx.capital} of the chain's staking asset through ${ctx.name} and keep the receipt token.`, cost: `$${ctx.capital} to stake, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Stake ${ctx.cap} of the chain's staking asset through ${ctx.name} and keep the receipt token.`, cost: `${ctx.cap} to stake, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Restake the ${ctx.name} staking rewards once a week so the position compounds.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: `If ${ctx.name} offers a liquid receipt, keep it in the farming wallet rather than selling it.`, cost: 'no extra capital', time: 'no extra time' },
     ],
@@ -1291,49 +1298,49 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('nft'),
     steps: (ctx) => [
-      { text: `List or buy one item for about $${ctx.capital} on ${ctx.name} on ${ctx.chain}, and keep the receipt.`, cost: `$${ctx.capital} for the item, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `List or buy one item for about ${ctx.cap} on ${ctx.name} on ${ctx.chain}, and keep the receipt.`, cost: `${ctx.cap} for the item, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Make one small trade a week on ${ctx.name} so the wallet shows regular marketplace activity.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('governance'),
     steps: (ctx) => [
-      { text: `Stake $${ctx.capital} for governance through ${ctx.name} on ${ctx.chain} and vote on the next proposal.`, cost: `$${ctx.capital} to stake, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Stake ${ctx.cap} for governance through ${ctx.name} on ${ctx.chain} and vote on the next proposal.`, cost: `${ctx.cap} to stake, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Vote on one ${ctx.name} proposal a week while the stake is locked.`, cost: 'no fee to vote', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('otc'),
     steps: (ctx) => [
-      { text: `Place one OTC order for about $${ctx.capital} through ${ctx.name} on ${ctx.chain} and settle it in the farming wallet.`, cost: `$${ctx.capital} for the order, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Place one OTC order for about ${ctx.cap} through ${ctx.name} on ${ctx.chain} and settle it in the farming wallet.`, cost: `${ctx.cap} for the order, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Place a small order once a week through ${ctx.name} so the desk sees regular flow.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('locker'),
     steps: (ctx) => [
-      { text: `Lock $${ctx.capital} of tokens through ${ctx.name} on ${ctx.chain} for the term the app suggests.`, cost: `$${ctx.capital} to lock, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Lock ${ctx.cap} of tokens through ${ctx.name} on ${ctx.chain} for the term the app suggests.`, cost: `${ctx.cap} to lock, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} lock once a week and note the unlock date.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('btc') || c.includes('bitcoin'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} of the wrapped asset through ${ctx.name} on ${ctx.chain} and keep the receipt.`, cost: `$${ctx.capital} to deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} of the wrapped asset through ${ctx.name} on ${ctx.chain} and keep the receipt.`, cost: `${ctx.cap} to deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} peg once a week and note any drift.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: (c) => c.includes('cedefi'),
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} into ${ctx.name}'s managed account on ${ctx.chain} and keep the balance in the farming wallet.`, cost: `$${ctx.capital} to deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} into ${ctx.name}'s managed account on ${ctx.chain} and keep the balance in the farming wallet.`, cost: `${ctx.cap} to deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Check the ${ctx.name} account once a week and note the reported yield.`, cost: 'no fee to check', time: '10 minutes a week' },
     ],
   },
   {
     match: () => true,
     steps: (ctx) => [
-      { text: `Deposit $${ctx.capital} of USDC into ${ctx.name} on ${ctx.chain} and keep the position open.`, cost: `$${ctx.capital} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
+      { text: `Deposit ${ctx.cap} of USDC into ${ctx.name} on ${ctx.chain} and keep the position open.`, cost: `${ctx.cap} deposit, about $${Math.max(2, Math.round(ctx.gas / 4))} of gas`, time: '15 minutes to set up' },
       { text: `Make one qualifying action a week inside ${ctx.name}, such as a deposit, a swap or a vote.`, cost: 'about $2 of gas a week', time: '10 minutes a week' },
     ],
   },
@@ -1343,7 +1350,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
  *  last. The plan is derived from the protocol's own record (category, chains, TVL,
  *  age), never from a hand-written list of names. */
 export function farmPlanSteps(p: SnapshotProtocol, age: number | null, capital: number, gas: number): FarmStep[] {
-  const ctx: PlanCtx = { name: p.name, capital, chain: chainOf(p), gas, hold: holdDaysFor(age) };
+  const ctx: PlanCtx = { name: p.name, capital, cap: '$' + capital.toLocaleString('en-US'), chain: chainOf(p), gas, hold: holdDaysFor(age) };
   const c = (p.category ?? '').toLowerCase();
   const template = PLAN_TEMPLATES.find((t) => t.match(c))!;
   return [walletStep(), ...template.steps(ctx), holdStep(ctx), claimStep(ctx)];
@@ -1351,9 +1358,10 @@ export function farmPlanSteps(p: SnapshotProtocol, age: number | null, capital: 
 
 /**
  * A protocol's full farm plan: the action steps plus the verdict step, costed with the
- *  net and the break-even. The last step states the odds-based verdict, the net on a
+ *  net and the break-even. The last step states the verdict, the net on a
  *  $1,000 ticket and the ticket size (or odds) that pays; when no ticket pays it says
- *  so plainly. The net is information only; it never changes the verdict.
+ *  so plainly. The verdict is odds AND money: farm only when the odds are >= 0.5 and
+ *  the net at the $1,000 plan size is positive.
  */
 export function farmSteps(p: SnapshotProtocol, age: number | null, capital: number, gas: number, verdict: 'farm' | 'thin' | 'skip', odds: number, net: NetInfo): FarmStep[] {
   const hold = net.hold_days;
@@ -1366,7 +1374,7 @@ export function farmSteps(p: SnapshotProtocol, age: number | null, capital: numb
     ...farmPlanSteps(p, age, capital, gas),
     {
       text: verdictText,
-      cost: `about $${total} all in`,
+      cost: `about $${total.toLocaleString('en-US')} all in`,
       time: `${hold} days of holding`,
     },
   ];

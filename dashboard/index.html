@@ -22,12 +22,16 @@
     <p class="formula-line">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × token odds</p>
     <p class="formula-note">Growth carry = 1 + 0.01 × clip(7-day TVL change, ±25%) — a stated projection, not a fit.</p>
 
-    <p class="strip" aria-label="Coverage and model fit">Watchlist <b id="kpi-watchlist">—</b> · Board <b id="kpi-board">—</b> · Live <b id="kpi-live">—</b> · LOO <b id="kpi-loo">—</b> · WF <b id="kpi-loo-sub">—</b> · Brier <b id="kpi-brier">—</b> (base <span id="kpi-brier-sub">—</span>) · Range <b id="kpi-range">—</b> · P10–P90 <span id="kpi-range-sub">—</span></p>
+    <p class="strip" aria-label="Coverage and model fit">Watchlist <b id="kpi-watchlist">—</b> · Board <b id="kpi-board">—</b> · Live <b id="kpi-live">—</b> · LOO <b id="kpi-loo">—</b> · WF <b id="kpi-loo-sub">—</b> · Brier <b id="kpi-brier">—</b> (base <span id="kpi-brier-sub">—</span>) · P25–P75 hit <b id="kpi-range">—</b> (stated 50%) · P10–P90 <span id="kpi-range-sub">—</span> (stated 80%)</p>
     <p class="integrity" id="integrity">Integrity: checking the table against its own arithmetic…</p>
 
-    <p class="lede">Each protocol is scored from its own snapshot figures: a size curve in TVL
-    fitted to the live-token comparables, times a category effect. The verdict is odds-based —
-    farm at 50% or better — and a crasher is never farm. Implied value ranks; it does not price.</p>
+    <section class="cover-evidence" aria-label="Held-out evidence">
+      <p class="cover-label">Held-out evidence — every term tested leave-one-out and walk-forward on the 128 live comps</p>
+      <table class="evidence cover-table">
+        <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">Kept</th></tr></thead>
+        <tbody id="cover-evidence-body"></tbody>
+      </table>
+    </section>
 
     <section class="controls" aria-label="Board controls">
       <div class="field">
@@ -70,6 +74,8 @@
       <span class="count" id="count" aria-live="polite"></span>
     </section>
 
+    <div id="board-wrap" tabindex="-1"></div>
+
     <section class="panel whatif" aria-labelledby="whatif-title">
       <h2 id="whatif-title">What-if: re-price the board at your size</h2>
       <div class="whatif-grid">
@@ -101,8 +107,6 @@
       </div>
       <p class="whatif-summary" id="whatif-summary" aria-live="polite"></p>
     </section>
-
-    <div id="board-wrap" tabindex="-1"></div>
 
     <section class="panel ledger" aria-labelledby="ledger-title">
       <h2 id="ledger-title">Protocol accounting</h2>
@@ -136,7 +140,7 @@ net on a ticket = implied x drop share x (ticket / TVL) - gas - ticket x 4% x (h
       the value fit.</p>
       <div class="table-wrap">
         <table class="evidence">
-          <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead>
+          <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">LOO MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead>
           <tbody id="evidence-body"></tbody>
         </table>
       </div>

@@ -34,11 +34,11 @@ button { cursor: pointer; }
   border-radius: 0 0 8px 0; text-decoration: none;
 }
 .skip:focus { left: 16px; top: 16px; }
-.shell { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
+.shell { max-width: 1280px; margin: 0 auto; padding: 8px 32px 48px; }
 
 .top {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
-  padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .mark { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex: none; }
@@ -47,28 +47,27 @@ button { cursor: pointer; }
 .top-meta b { color: var(--text); font-weight: 600; }
 
 .strip {
-  font-size: 13px; color: var(--muted); padding: 14px 0 4px; max-width: 120ch;
+  font-size: 13px; color: var(--muted); padding: 6px 0 2px;
 }
 .strip b { color: var(--text); font-family: var(--font-num); font-weight: 600; }
 
-.lede { color: var(--muted); max-width: 78ch; padding-bottom: 12px; }
 .formula-line {
   font-family: var(--font-num); font-size: 15px; font-weight: 600; color: var(--text);
-  padding: 20px 0 4px; overflow-wrap: anywhere;
+  padding: 6px 0 4px; overflow-wrap: anywhere;
 }
 .formula-note { color: var(--muted); font-size: 13px; max-width: 100ch; padding-bottom: 4px; }
 
 .controls {
-  display: flex; flex-wrap: wrap; align-items: end; gap: 12px;
-  padding: 16px 0; border-top: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; align-items: end; gap: 10px;
+  padding: 6px 0; border-top: 1px solid var(--border);
 }
 .field { display: grid; gap: 4px; }
 .field label, .field-label { color: var(--muted); font-size: 12px; }
 .field input, .field select {
-  min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface); color: var(--text); min-width: 120px;
 }
-.field input { min-width: 190px; }
+.field input { min-width: 170px; }
 .field select option { background: var(--surface); }
 .tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .tabs button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
@@ -78,7 +77,7 @@ button { cursor: pointer; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+th, td { padding: 4px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
 th { color: var(--muted); font-size: 12px; font-weight: 500; white-space: nowrap; }
 th button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: inherit; font: inherit; }
 th button:hover { color: var(--text); }
@@ -89,7 +88,10 @@ tbody tr:last-child td { border-bottom: 0; }
 .name { display: grid; gap: 2px; }
 .name b { font-weight: 600; }
 .sub { color: var(--muted); font-size: 12px; }
-.plan { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.plan {
+  display: block; color: var(--muted); font-size: 12px; line-height: 1.45;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .guard {
   display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
   color: var(--red); border: 1px solid var(--red); background: rgba(248, 81, 73, 0.1); white-space: nowrap;
@@ -102,7 +104,8 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 .pos { color: var(--accent); }
 .neg { color: var(--red); }
-.bar { width: 110px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.bar { width: 40px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.implied .sub { white-space: nowrap; }
 .bar i { display: block; height: 100%; background: var(--accent); }
 .implied { display: flex; align-items: center; gap: 8px; }
 .badge {
@@ -131,7 +134,7 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .detail {
   width: min(680px, 94vw); background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: 14px; padding: 24px; max-height: 88vh;
+  border: 1px solid var(--border); border-radius: 14px; padding: 16px 24px; max-height: 88vh;
 }
 .detail::backdrop { background: rgba(1, 4, 9, 0.7); }
 .detail-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
@@ -141,13 +144,13 @@ tbody tr:last-child td { border-bottom: 0; }
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text);
 }
 .detail h2 { margin-top: 4px; }
-.detail-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.detail-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .detail-section h3 { margin: 0 0 8px; }
-.equation { display: grid; gap: 8px; font-family: var(--font-num); font-size: 13px; }
+.equation { display: grid; gap: 5px; font-family: var(--font-num); font-size: 12px; }
 .equation div { display: flex; justify-content: space-between; gap: 12px; }
 .equation span { color: var(--muted); }
-.verdict-line { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.steps { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
+.verdict-line { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
 .steps li { padding-left: 4px; }
 .steps b { display: block; font-weight: 500; }
 .cost { color: var(--muted); font-size: 12px; font-family: var(--font-num); }
@@ -164,8 +167,14 @@ tbody tr:last-child td { border-bottom: 0; }
 /* Ledger, what-if, evidence (v3 additions). */
 .integrity {
   color: var(--muted); font-size: 13px; font-family: var(--font-num);
-  padding: 0 0 12px; max-width: none;
+  padding: 0 0 4px; max-width: none;
 }
+.cover-evidence { margin: 0 0 4px; }
+.cover-label { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.cover-table { font-size: 13px; }
+.cover-table th, .cover-table td { padding: 2px 10px; }
+.cover-table td:nth-child(2), .cover-table td:nth-child(3),
+.cover-table th:nth-child(2), .cover-table th:nth-child(3) { text-align: right; }
 .ledger { margin-top: 0; padding: 24px; }
 .ledger h2 { margin-bottom: 8px; }
 .ledger p { color: var(--muted); margin-top: 8px; max-width: 78ch; }

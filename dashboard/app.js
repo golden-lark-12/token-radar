@@ -70,16 +70,18 @@
     beO = (beO > 0 && beO <= 0.95) ? Math.round(beO * 1e4) / 1e4 : null;
     return { hold: hold, hours: hours, slice: slice, gas: gas, tbill: tbill, net: net, nph: net / hours, beT: beT, beO: beO };
   }
-  // The verdict at the what-if controls. At the defaults it is the model's odds-based verdict.
-  // Off the defaults it is money-based: farm when the expected slice clears gas and the forgone
-  // yield at this size, thin when the odds are still strong, skip otherwise. A bigger ticket
-  // turns more rows farmable because the slice grows with the ticket while gas stays flat.
-  // The crash guard applies in both modes: 7d down 15% can never be farm, down 30% is skip.
+  // The verdict at the what-if controls. At the defaults it is the stored verdict:
+  // farm only when the odds are >= 50% AND the net at the $1,000 ticket is positive.
+  // Off the defaults the same rule is applied at the re-priced net, so a bigger ticket
+  // turns more rows farmable because the slice grows with the ticket while gas stays
+  // flat. The crash guard applies in both modes: 7d down 15% can never be farm, down
+  // 30% is skip.
   function shownVerdict(r, priced) {
     var v;
+    var odds = tokenOdds(r);
     if (isDefault()) v = r.verdict || 'skip';
-    else if (priced.net > 0) v = 'farm';
-    else { var odds = tokenOdds(r); v = (odds !== null && odds >= 0.5) ? 'thin' : 'skip'; }
+    else if (priced.net > 0 && odds !== null && odds >= 0.5) v = 'farm';
+    else v = (odds !== null && odds >= 0.3) ? 'thin' : 'skip';
     if (typeof r.change_7d === 'number') {
       if (r.change_7d <= -30) return 'skip';
       if (r.change_7d <= -15 && v === 'farm') return 'thin';
@@ -188,11 +190,28 @@
     var td1 = document.createElement('td'); td1.textContent = t.term;
     var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = (typeof t.loo_miss === 'number') ? '×' + t.loo_miss.toFixed(2) : '—';
     var td3 = document.createElement('td'); td3.className = 'num'; td3.textContent = (typeof t.wf_miss === 'number') ? '×' + t.wf_miss.toFixed(2) : '—';
-    var td4 = document.createElement('td'); td4.className = 'num'; td4.textContent = (typeof t.medape === 'number') ? (t.medape * 100).toFixed(1) + '%' : (t.medape || '—');
+    var td4 = document.createElement('td'); td4.className = 'num'; td4.textContent = (typeof t.loo_medape === 'number') ? (t.loo_medape * 100).toFixed(1) + '%' : '—';
     var td5 = document.createElement('td'); td5.textContent = t.kept ? 'kept' : 'tested, dropped';
     var td6 = document.createElement('td'); td6.className = 'sub'; td6.textContent = t.note || '';
     tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5); tr.appendChild(td6);
     evBody.appendChild(tr);
+  });
+
+  // Cover evidence table: the held-out test in five rows, above the board — baseline,
+  // size curve alone, the kept model, and the two fitted terms tested and dropped.
+  var coverEv = document.getElementById('cover-evidence-body');
+  var coverIdx = [0, 1, 3, 4, 5];
+  var coverLabels = ['Flat baseline', 'Size curve only', 'Size + category — kept', '+ growth, fitted', '+ age, fitted'];
+  coverIdx.forEach(function (ix, k) {
+    var t = DATA.fit_terms[ix];
+    if (!t || !coverEv) return;
+    var tr = document.createElement('tr');
+    var td1 = document.createElement('td'); td1.textContent = coverLabels[k];
+    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = (typeof t.loo_miss === 'number') ? '×' + t.loo_miss.toFixed(2) : '—';
+    var td3 = document.createElement('td'); td3.className = 'num'; td3.textContent = (typeof t.wf_miss === 'number') ? '×' + t.wf_miss.toFixed(2) : '—';
+    var td4 = document.createElement('td'); td4.textContent = t.kept ? 'kept' : 'tested, dropped';
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    coverEv.appendChild(tr);
   });
 
   // Category effects on value, derived from the rows' own stored effect — no hardcoded table.
@@ -234,7 +253,7 @@
       ', net ' + fmtMoney2(priced.net) + ' (' + fmtMoney2(priced.nph) + '/hour). ' + pays;
     var capital = (typeof p.farm_cost_usd === 'number' && isFinite(p.farm_cost_usd)) ? p.farm_cost_usd : 50;
     var gas = (typeof p.farm_gas_usd === 'number' && isFinite(p.farm_gas_usd)) ? p.farm_gas_usd : 4;
-    steps.push({ text: verdictText, cost: 'about $' + (capital + gas) + ' all in', time: priced.hold + ' days of holding' });
+    steps.push({ text: verdictText, cost: 'about $' + fmtInt(capital + gas) + ' all in', time: priced.hold + ' days of holding' });
     return steps;
   }
 
@@ -301,17 +320,37 @@
     if (!v) return el('span', { class: 'sub', text: '—' });
     return el('span', { class: 'badge v-' + v, text: v });
   }
-  function chainSub(r) {
-    return catOf(r) + ' on ' + (r.chains && r.chains.length ? r.chains.slice(0, 2).join(', ') : 'an unnamed chain');
+  // Short farm plan for the board row: one line from the row's own parts — the
+  // category's action, name, first two chains and gas. The $1,000 plan size is in
+  // the Cost column and the hold in the Time column, so the line stays short enough
+  // to read whole; names, chains and gas differ by row.
+  var PLAN_ACTIONS = [
+    ['lend', 'Supply + borrow'], ['cdp', 'Supply + borrow'], ['collateral', 'Supply + borrow'],
+    ['dex', 'Provide liquidity'], ['liquidity manager', 'Provide liquidity'], ['leveraged farm', 'Provide liquidity'],
+    ['yield', 'Strategy deposit'],
+    ['curator', 'Vault deposit'], ['allocator', 'Vault deposit'],
+    ['rwa', 'Mint yield asset'], ['stable', 'Mint yield asset'], ['reserve currency', 'Mint yield asset'],
+    ['basis', 'Margin + hedge'], ['derivative', 'Margin + hedge'], ['perpetual', 'Margin + hedge'],
+    ['options', 'Margin + hedge'], ['synthetic', 'Margin + hedge'], ['interest rate', 'Margin + hedge'],
+    ['chain', 'Weekly activity'], ['ai agent', 'Weekly activity'], ['decentralized ai', 'Weekly activity'],
+    ['prediction', 'Fund a market'], ['bridge', 'Bridge'], ['launchpad', 'Join launch'],
+    ['index', 'Buy index'], ['payment', 'Spend'], ['card issuer', 'Spend'],
+    ['privacy', 'Private pool'], ['insurance', 'Buy cover'],
+    ['staking', 'Stake'], ['restak', 'Stake'], ['nft', 'Trade item'],
+    ['governance', 'Stake + vote'], ['otc', 'OTC order'], ['locker', 'Lock tokens'],
+    ['btc', 'Deposit wrapped'], ['bitcoin', 'Deposit wrapped'], ['cedefi', 'Managed deposit'],
+  ];
+  function planAction(r) {
+    var c = (r.category || '').toLowerCase();
+    for (var i = 0; i < PLAN_ACTIONS.length; i++) {
+      if (c.indexOf(PLAN_ACTIONS[i][0]) >= 0) return PLAN_ACTIONS[i][1];
+    }
+    return 'Deposit';
   }
-  // Short farm plan for the board row: the action step, trimmed to the deed, plus its cost,
-  // its time and the hold. The full plan is in the detail view.
   function shortAction(r, priced) {
-    var steps = r.farm_steps || [];
-    var act = steps.length > 1 ? steps[1] : (steps[0] || null);
-    if (!act) return null;
-    var text = act.text.replace(/ and (keep|hold|use) [^.]*\.?$/, '.');
-    return text + ' · ' + act.cost + ' · ' + act.time;
+    var chains = (r.chains || []).slice(0, 2).join(' + ') || 'its main chain';
+    var gas = (typeof r.farm_gas_usd === 'number' && isFinite(r.farm_gas_usd)) ? r.farm_gas_usd : 15;
+    return planAction(r) + ' · ' + r.name + ' · ' + chains + ' · $' + gas + ' gas';
   }
 
   function boardTable() {
@@ -354,7 +393,6 @@
         )),
         el('td', null, el('div', { class: 'name' },
           el('b', { text: r.name }),
-          el('span', { class: 'sub', text: chainSub(r) }),
           r.guard_reason ? el('span', { class: 'guard', text: r.guard_reason }) : null,
           r.family_child ? el('span', { class: 'fam', text: 'parent already has a token' }) : null,
           plan ? el('span', { class: 'plan', text: plan }) : null
@@ -364,7 +402,7 @@
           el('div', { class: 'bar', 'aria-hidden': 'true' }, el('i', { style: 'width:' + Math.max(3, Math.round((r.implied_value_usd / max) * 100)) + '%' })),
           el('div', { class: 'name' },
             el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) }),
-            el('span', { class: 'sub', text: 'P25 ' + fmtUsd(r.implied_p25_usd) + ' – P75 ' + fmtUsd(r.implied_p75_usd) })
+            el('span', { class: 'sub', text: fmtUsd(r.implied_p25_usd) + ' – ' + fmtUsd(r.implied_p75_usd) })
           )
         )),
         el('td', { class: 'num', text: odds === null ? 'n/a' : Math.round(odds * 100) + '%' }),
@@ -379,7 +417,7 @@
     return el('div', { class: 'panel' },
       el('div', { class: 'table-wrap' },
         el('table', null,
-          el('caption', { class: 'sub', text: 'Strongest implied value first; implied shows the middle-50% range (P25–P75). Cost is the farm deposit, Time the hold; select a row for the full farm plan.' }),
+          el('caption', { class: 'sub', text: 'Strongest implied value first · implied shows P25–P75 · Cost is the deposit at the $1,000 ticket · FARM needs odds ≥ 50% and a positive net · select a row for the full plan.' }),
           el('thead', null, el('tr', null,
             sortHeader('rank', 'Rank'),
             el('th', { scope: 'col', text: 'Protocol' }),
@@ -477,7 +515,7 @@
     dialog.appendChild(el('div', { class: 'verdict-line' },
       verdictBadge(verdict),
       row.guard_reason ? el('span', { class: 'guard', text: row.guard_reason }) : null,
-      el('span', { class: 'sub', text: 'Net ' + fmtNet(priced.nph) + '/hour at $' + fmtInt(state.ticket) + ' · pays from ' + (priced.beT !== null ? '$' + fmtInt(priced.beT) : 'never') + ' · deposit $' + capital + ' · gas ~$' + gas + ' · hold ' + priced.hold + ' days' })
+      el('span', { class: 'sub', text: 'Net ' + fmtNet(priced.nph) + '/hour at $' + fmtInt(state.ticket) + ' · pays from ' + (priced.beT !== null ? '$' + fmtInt(priced.beT) : 'never') + ' · deposit $' + fmtInt(capital) + ' · gas ~$' + gas + ' · hold ' + priced.hold + ' days' })
     ));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Model breakdown' }),
@@ -564,7 +602,7 @@
     var holdLabel = state.horizon === 'model' ? 'model hold' : state.horizon + ' days';
     setText('whatif-summary', 'At $' + fmtInt(state.ticket) + ' · ' + Math.round(state.share * 1000) / 10 + '% drop · ' + holdLabel +
       ': ' + nFarm + ' FARM · best ' + fmtNet(best) + '/h — ' + bestName +
-      (isDefault() ? '' : ' · verdicts re-priced at this size; the board verdict is odds-based at the $1,000 default.'));
+      (isDefault() ? '' : ' · verdicts re-priced at this size; FARM needs odds ≥ 50% and a positive net at the $1,000 default.'));
   }
 
   var wrap = document.getElementById('board-wrap');
