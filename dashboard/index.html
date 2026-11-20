@@ -31,31 +31,45 @@
         <span class="kpi-sub">pre-token protocols ranked</span>
       </div>
       <div class="kpi">
-        <span class="kpi-label">Live-token comps</span>
-        <b class="kpi-value" id="kpi-live">—</b>
-        <span class="kpi-sub">market-cap-live, used for the fit</span>
+        <span class="kpi-label">Held-out miss, leave-one-out</span>
+        <b class="kpi-value" id="kpi-loo">—</b>
+        <span class="kpi-sub">flat multiple misses ×5.00</span>
       </div>
       <div class="kpi">
-        <span class="kpi-label">Median fitted multiple</span>
-        <b class="kpi-value" id="kpi-median">—</b>
-        <span class="kpi-sub">mcap / TVL, shrunk to the median</span>
-      </div>
-      <div class="kpi kpi-warn">
-        <span class="kpi-label">Held-out MedAPE</span>
-        <b class="kpi-value" id="kpi-medape">—</b>
-        <span class="kpi-sub">median absolute % error, held-out</span>
+        <span class="kpi-label">Walk-forward miss</span>
+        <b class="kpi-value" id="kpi-wf">—</b>
+        <span class="kpi-sub">fit on older, predict newer; flat ×5.29</span>
       </div>
       <div class="kpi">
-        <span class="kpi-label">Baseline MedAPE</span>
-        <b class="kpi-value" id="kpi-baseline">—</b>
-        <span class="kpi-sub">overall-median baseline, held-out</span>
+        <span class="kpi-label">Token odds, Brier score</span>
+        <b class="kpi-value" id="kpi-brier">—</b>
+        <span class="kpi-sub">base rate 0.248, 5-fold cross-validated</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Worth farming</span>
+        <b class="kpi-value" id="kpi-farm">—</b>
+        <span class="kpi-sub">on a $1,000 ticket, net of gas</span>
       </div>
     </section>
 
-    <p class="lede">Each protocol is scored from its own snapshot figures: TVL times a multiple
-    fitted to live-token comparables in its category, adjusted for seven-day growth and the odds it
-    ever launches a token. The fit was validated on a held-out split of live tokens. Implied value is
-    a model, not a promise — it ranks, it does not price.</p>
+    <p class="lede">Each protocol is scored from its own snapshot figures. The value if a token
+    launches is a power law in TVL fitted to the live-token comparables — market cap grows
+    sub-linearly with TVL, so a flat multiple over-values the largest protocols by up to 9× — adjusted
+    for seven-day growth and age. Token odds come from a logistic fit on all 758 protocols: age is the
+    signal, not the category. Implied value is a model, not a promise — it ranks, it does not price.</p>
+
+    <section class="panel ledger" aria-labelledby="ledger-title">
+      <h2 id="ledger-title">Protocol accounting</h2>
+      <p class="sub">All 758 snapshot protocols in exactly one group. The board ranks the pre-token
+      protocols; the rest are comparables or set aside by the house rules.</p>
+      <div class="ledger-bar" id="ledger-bar" aria-hidden="true"></div>
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th scope="col">Group</th><th scope="col">Count</th><th scope="col">Why</th></tr></thead>
+          <tbody id="ledger-body"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="controls" aria-label="Board controls">
       <div class="field">
@@ -103,25 +117,27 @@
     <section class="panel model" aria-labelledby="model-title">
       <h2 id="model-title">How implied value is computed</h2>
       <p class="sub">One function scores every row. No protocol name is special-cased, and no row
-      is hand-picked. Age is not in the formula: it shows no trend in the multiple, so the maturity
-      factor is flat at 1.0.</p>
-      <div class="formula">implied = TVL x fitted_multiple(category) x growth x token_odds
-growth = 1 + 0.01 x clip(change_7d, -30, +30)
-token_odds = clip(category token rate x TVL-band ratio x age-band ratio, 0.05, 0.95)</div>
-      <h3>Fitted multiples by category</h3>
-      <p class="sub">Fitted mcap / TVL multiples, shrunk toward the global positive median 0.214
-      and capped at 2.0. Categories with no live comparables use 0.214.</p>
+      is hand-picked. The coefficients are fitted on the snapshot's live-token protocols, not assumed.</p>
+      <div class="formula">if it launches = exp(8.9076 + 0.4649 x ln(TVL) - 2.8915 x growth/100 - 0.1769 x ln(age_days))
+token odds = 1 / (1 + exp(3.771 - 0.045 x ln(TVL) - 0.51 x ln(age_days))), clipped 0.05–0.95
+implied = if it launches x token odds
+net on $1,000 = implied x 10% x ($1,000 / TVL) - gas</div>
+      <h3>Out-of-sample evidence</h3>
+      <p class="sub">Each term is kept only if it lowers the held-out miss in both tests:
+      leave-one-out and walk-forward (fit on the older half of the live tokens, predict the newer
+      half). A flat median multiple is the baseline. A term that does not help in both tests is not used.</p>
       <div class="table-wrap">
-        <table class="multiples">
-          <thead><tr><th scope="col">Category</th><th scope="col">Fitted multiple</th></tr></thead>
-          <tbody id="multiples-body"></tbody>
+        <table class="evidence">
+          <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">Kept</th></tr></thead>
+          <tbody id="evidence-body"></tbody>
         </table>
       </div>
       <h3>Held-out validation</h3>
-      <p>Held-out validation on the 144 market-cap-live protocols, 80/20 split, 5 seeds — median
-      absolute percentage error 90–125% (seed 42: 98.8%). The category fit barely beats the
-      overall-median baseline (MedAPE 87–99%). This model ranks, it does not price — implied values
-      are order-of-magnitude scores with ~2x typical error.</p>
+      <p>Fitted and tested on the 95 live-token protocols with a complete record (market cap, TVL,
+      listed date, 7-day change). Leave-one-out miss ×2.90, walk-forward miss ×2.72 — against ×5.00 /
+      ×5.29 for a flat median multiple. Token odds: 5-fold cross-validated Brier 0.237 against a 0.248
+      base rate. This model ranks, it does not price — implied values are order-of-magnitude scores with
+      ~3× typical error.</p>
     </section>
   </main>
 </div>

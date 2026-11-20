@@ -1,6 +1,6 @@
-// Token Radar dashboard, model radar-2. Reads window.RADAR (data.js, written beside dashboard/)
-// and renders the ranked pre-token board, the live-token comparison set, and the fitted model.
-// No network: every byte shown comes from data.js.
+// Token Radar dashboard, model radar-3. Reads window.RADAR (data.js, written beside dashboard/)
+// and renders the ranked pre-token board, the live-token comparison set, the protocol ledger,
+// the out-of-sample evidence and the fitted model. No network: every byte shown comes from data.js.
 (function () {
   'use strict';
 
@@ -14,20 +14,10 @@
     return;
   }
   if (!Array.isArray(DATA.live)) DATA.live = [];
+  if (!Array.isArray(DATA.ledger)) DATA.ledger = [];
+  if (!Array.isArray(DATA.fit_terms)) DATA.fit_terms = [];
   var FIT = DATA.fit || {};
-
-  // Fitted mcap/TVL multiples per category, shrunk toward the global positive median 0.214 and
-  // capped at 2.0. Categories with no live comparables use 0.214. These are model constants.
-  var FITTED = {
-    'Dexs': 0.302, 'Lending': 0.153, 'Liquid Staking': 0.103, 'Yield': 0.199,
-    'RWA': 0.253, 'Canonical Bridge': 0.542, 'Basis Trading': 0.471, 'Bridge': 0.401,
-    'Yield Aggregator': 0.186, 'Cross Chain Bridge': 0.661, 'Onchain Capital Allocator': 0.156,
-    'CDP': 0.197, 'Derivatives': 0.770, 'Liquid Restaking': 0.205, 'Restaking': 0.160,
-    'Staking Pool': 0.153, 'Payments': 0.205, 'AI Agents': 0.326, 'Indexes': 0.189,
-    'Privacy': 0.497, 'Token Locker': 2.000, 'Collateral Management': 2.000,
-    'Prediction Market': 2.000, 'Risk Curators': 0.674, 'Chain': 0.683
-  };
-  var FALLBACK_MULTIPLE = 0.214;
+  var MODEL = DATA.model || {};
 
   var state = { q: '', category: 'all', chain: 'all', odds: 0, verdict: 'all', tab: 'pre', sort: 'implied', dir: -1 };
 
@@ -39,6 +29,11 @@
     if (Math.abs(n) >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
     return usd0.format(n);
   }
+  function fmtNet(n) {
+    if (n === null || n === undefined || !isFinite(n)) return 'n/a';
+    var sign = n < 0 ? '-' : '+';
+    return sign + '$' + Math.abs(n).toFixed(2);
+  }
   function fmtPct(n) {
     if (n === null || n === undefined || !isFinite(n)) return 'n/a';
     return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
@@ -48,27 +43,12 @@
     if (days >= 365) return (days / 365).toFixed(1) + 'y';
     return Math.max(0, Math.round(days)) + 'd';
   }
-  function fmtMedape(v) {
-    if (typeof v !== 'number' || !isFinite(v)) return 'n/a';
-    return (Number.isInteger(v) ? String(v) : v.toFixed(1)) + '%';
-  }
   function catOf(r) { return r.category || 'Other'; }
-  function fittedMultiple(r) {
-    if (typeof r.fitted_multiple === 'number' && isFinite(r.fitted_multiple)) return r.fitted_multiple;
-    var m = FITTED[r.category];
-    return typeof m === 'number' ? m : FALLBACK_MULTIPLE;
-  }
   function tokenOdds(r) {
     return (typeof r.token_odds === 'number' && isFinite(r.token_odds)) ? r.token_odds : null;
   }
-  function growthMult(r) {
-    if (typeof r.growth_multiplier === 'number' && isFinite(r.growth_multiplier)) return r.growth_multiplier;
-    var g = (r.change_7d === null || r.change_7d === undefined) ? 0 : r.change_7d;
-    return 1 + 0.01 * Math.min(30, Math.max(-30, g));
-  }
-  function maturityMult(r) {
-    if (typeof r.maturity_multiplier === 'number' && isFinite(r.maturity_multiplier)) return r.maturity_multiplier;
-    return 1;
+  function netOf(r) {
+    return (typeof r.net_usd === 'number' && isFinite(r.net_usd)) ? r.net_usd : null;
   }
 
   function el(tag, attrs) {
@@ -124,15 +104,19 @@
   }
   function farmSteps(p) {
     var chain = chainOf(p);
-    var capital = capitalFor(p);
+    var capital = (typeof p.farm_cost_usd === 'number' && isFinite(p.farm_cost_usd)) ? p.farm_cost_usd : capitalFor(p);
+    var gas = (typeof p.farm_gas_usd === 'number' && isFinite(p.farm_gas_usd)) ? p.farm_gas_usd : (capital >= 150 ? 8 : 4);
     var hold = holdDaysFor(p.age_days);
+    var net = netOf(p);
+    var netText = net === null ? 'n/a' : fmtNet(net);
+    var verdict = (p.verdict || 'skip').toUpperCase();
     return [
       { text: 'Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.', cost: 'under $3 of gas', time: '5 minutes' },
       { text: actionFor(p, capital, chain), cost: '$' + capital + ' deposit, about $' + (capital >= 150 ? 8 : 4) + ' of gas', time: '15 minutes to set up' },
       { text: 'Make one qualifying action each week, such as a deposit, a borrow, a swap or a vote.', cost: 'about $2 of gas a week', time: '10 minutes a week' },
       { text: 'Hold the position for at least ' + hold + ' days so the activity is counted in more than one snapshot.', cost: '$' + capital + ' stays in the position', time: hold + ' days' },
       { text: "Before you withdraw, open the protocol's own points or rewards page and claim only from the link it publishes.", cost: 'no fee to check; never pay to claim', time: '10 minutes' },
-      { text: 'Write the wallet, the dates and every transaction in a farm log so you can repeat the position or unwind it.', cost: 'nothing but the log', time: '5 minutes' }
+      { text: 'Verdict ' + verdict + ': on a $1,000 ticket the expected airdrop slice nets ' + netText + ' after ~$' + gas + ' of gas, so the full run costs about $' + (capital + gas) + ' ($' + capital + ' deposit, ~$' + gas + ' gas). Farm it only if that net clears your bar; the implied value and token odds above are the model\u2019s read, not a promise.', cost: 'about $' + (capital + gas) + ' all in', time: hold + ' days of holding' }
     ];
   }
 
@@ -141,21 +125,61 @@
     if (n) n.textContent = text;
   }
 
-  // Header and KPI strip, from the data. The held-out MedAPE is shown as it is: the fit is honest
-  // about its error, and the baseline next to it shows how little the category fit beats it.
+  // Header and KPI strip, from the data.
   setText('snap-date', DATA.as_of || '—');
   setText('model-ver', DATA.model_version || '—');
   var wl = DATA.watchlist_size || DATA.rows.length;
   setText('kpi-watchlist', wl + ' / ' + wl);
   setText('kpi-board', String(DATA.board_size || DATA.rows.length));
-  var nLive = (typeof FIT.n_live === 'number' && isFinite(FIT.n_live)) ? FIT.n_live : (DATA.live.length || 144);
-  setText('kpi-live', String(nLive));
-  var med = (typeof FIT.median_multiple === 'number' && isFinite(FIT.median_multiple)) ? FIT.median_multiple : 0.214;
-  setText('kpi-median', med.toFixed(3) + '×');
-  var hm = (typeof FIT.heldout_medape === 'number' && isFinite(FIT.heldout_medape)) ? FIT.heldout_medape : 98.8;
-  setText('kpi-medape', fmtMedape(hm));
-  var base = (typeof FIT.baseline_medape === 'string' && FIT.baseline_medape) ? FIT.baseline_medape : '87-99%';
-  setText('kpi-baseline', base);
+  var loo = (typeof FIT.loo_miss === 'number' && isFinite(FIT.loo_miss)) ? FIT.loo_miss : 2.9;
+  setText('kpi-loo', '×' + loo.toFixed(2));
+  var wf = (typeof FIT.wf_miss === 'number' && isFinite(FIT.wf_miss)) ? FIT.wf_miss : 2.72;
+  setText('kpi-wf', '×' + wf.toFixed(2));
+  var br = (typeof FIT.odds_brier_cv === 'number' && isFinite(FIT.odds_brier_cv)) ? FIT.odds_brier_cv : 0.237;
+  setText('kpi-brier', br.toFixed(3));
+  var nFarm = DATA.rows.filter(function (r) { return r.verdict === 'farm'; }).length;
+  setText('kpi-farm', nFarm + ' FARM');
+
+  // Protocol accounting ledger: every snapshot protocol in exactly one group.
+  var ledgerBar = document.getElementById('ledger-bar');
+  var ledgerBody = document.getElementById('ledger-body');
+  var ledgerTotal = DATA.ledger_total || DATA.ledger.reduce(function (s, g) { return s + (g.count || 0); }, 0) || 758;
+  var ledgerColors = ['#3fb950', '#56d364', '#1f6feb', '#8957e5', '#9e6a03', '#bc8cff', '#f778ba', '#d29922', '#8b949e'];
+  DATA.ledger.forEach(function (g, i) {
+    var tr = document.createElement('tr');
+    var td1 = document.createElement('td'); td1.textContent = g.label;
+    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = String(g.count);
+    var td3 = document.createElement('td'); td3.className = 'sub'; td3.textContent = g.note || '';
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    ledgerBody.appendChild(tr);
+    if (ledgerBar && g.count > 0) {
+      var seg = document.createElement('i');
+      seg.style.width = (g.count / ledgerTotal * 100).toFixed(2) + '%';
+      seg.style.background = ledgerColors[i % ledgerColors.length];
+      seg.title = g.label + ': ' + g.count;
+      ledgerBar.appendChild(seg);
+    }
+  });
+  (function () {
+    var tr = document.createElement('tr');
+    var td1 = document.createElement('td'); td1.textContent = 'Total';
+    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = String(ledgerTotal);
+    var td3 = document.createElement('td'); td3.className = 'sub'; td3.textContent = 'every snapshot protocol, exactly once';
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    ledgerBody.appendChild(tr);
+  })();
+
+  // Out-of-sample evidence table: which terms were kept, and the held-out miss for each.
+  var evBody = document.getElementById('evidence-body');
+  DATA.fit_terms.forEach(function (t) {
+    var tr = document.createElement('tr');
+    var td1 = document.createElement('td'); td1.textContent = t.term;
+    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = '×' + Number(t.loo_miss).toFixed(2);
+    var td3 = document.createElement('td'); td3.className = 'num'; td3.textContent = '×' + Number(t.wf_miss).toFixed(2);
+    var td4 = document.createElement('td'); td4.textContent = t.kept ? 'kept' : 'baseline';
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+    evBody.appendChild(tr);
+  });
 
   // Controls: category and chain options come from the board itself.
   function fillSelect(id, values) {
@@ -170,23 +194,6 @@
   fillSelect('cat', cats);
   var chains = Array.from(new Set(DATA.rows.reduce(function (a, r) { return a.concat(r.chains || []); }, []))).sort();
   fillSelect('chain', chains);
-
-  // Fitted multiples table, from the model constants above.
-  var mb = document.getElementById('multiples-body');
-  Object.keys(FITTED).sort().forEach(function (c) {
-    var tr = document.createElement('tr');
-    var td1 = document.createElement('td'); td1.textContent = c;
-    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = FITTED[c].toFixed(3) + '×';
-    tr.appendChild(td1); tr.appendChild(td2);
-    mb.appendChild(tr);
-  });
-  (function () {
-    var tr = document.createElement('tr');
-    var td1 = document.createElement('td'); td1.textContent = 'All other / no-comp categories';
-    var td2 = document.createElement('td'); td2.className = 'num'; td2.textContent = FALLBACK_MULTIPLE.toFixed(3) + '×';
-    tr.appendChild(td1); tr.appendChild(td2);
-    mb.appendChild(tr);
-  })();
 
   function filteredRows() {
     var q = state.q.trim().toLowerCase();
@@ -218,6 +225,10 @@
       else if (key === 'odds') {
         av = tokenOdds(a); av = av === null ? -1 : av;
         bv = tokenOdds(b); bv = bv === null ? -1 : bv;
+      }
+      else if (key === 'net') {
+        av = netOf(a); av = av === null ? -Infinity : av;
+        bv = netOf(b); bv = bv === null ? -Infinity : bv;
       }
       else { av = a.implied_value_usd; bv = b.implied_value_usd; }
       if (av < bv) return -state.dir;
@@ -277,6 +288,8 @@
       var growth = r.change_7d === null || r.change_7d === undefined ? 'n/a' : fmtPct(r.change_7d);
       var growthClass = (r.change_7d === null || r.change_7d === undefined) ? '' : r.change_7d >= 0 ? 'pos' : 'neg';
       var odds = tokenOdds(r);
+      var net = netOf(r);
+      var netClass = net === null ? '' : net >= 0 ? 'pos' : 'neg';
       var tr = el('tr', {
         tabindex: '0',
         onclick: function () { openDetail(r.slug); },
@@ -295,6 +308,7 @@
           el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) })
         )),
         el('td', { class: 'num', text: odds === null ? 'n/a' : Math.round(odds * 100) + '%' }),
+        el('td', { class: 'num ' + netClass, text: fmtNet(net) }),
         el('td', null, verdictBadge(r.verdict || null))
       );
       tbody.appendChild(tr);
@@ -302,7 +316,7 @@
     return el('div', { class: 'panel' },
       el('div', { class: 'table-wrap' },
         el('table', null,
-          el('caption', { class: 'sub', text: 'Pre-token protocols, strongest implied value first. Select a row for its model breakdown and farm plan.' }),
+          el('caption', { class: 'sub', text: 'Pre-token protocols, strongest implied value first. Net is the expected airdrop slice on a $1,000 ticket after gas. Select a row for its model breakdown and farm plan.' }),
           el('thead', null, el('tr', null,
             sortHeader('rank', 'Rank'),
             el('th', { scope: 'col', text: 'Protocol' }),
@@ -311,6 +325,7 @@
             sortHeader('age', 'Age'),
             sortHeader('implied', 'Implied value'),
             sortHeader('odds', 'Token odds'),
+            sortHeader('net', 'Net / $1,000'),
             el('th', { scope: 'col', text: 'Verdict' })
           )),
           tbody
@@ -337,7 +352,7 @@
       ));
     });
     return el('div', { class: 'panel' },
-      el('p', { class: 'note', text: 'Market facts, not a model: these protocols already trade, so their market cap is the market\u2019s own value. They are the comparables the multiples were fitted to, set aside from the pre-token ranking.' }),
+      el('p', { class: 'note', text: 'Market facts, not a model: these protocols already trade, so their market cap is the market\u2019s own value. They are the comparables the power law was fitted to, set aside from the pre-token ranking.' }),
       el('div', { class: 'table-wrap' },
         el('table', null,
           el('caption', { class: 'sub', text: 'Live-token protocols by market cap.' }),
@@ -355,6 +370,28 @@
     );
   }
 
+  // Recompute a row in the page from the snapshot figures and the model constants, so the
+  // page's code and the board's data are visibly the same arithmetic.
+  function recompute(row) {
+    var m = MODEL;
+    var vc = typeof m.value_const === 'number' ? m.value_const : 8.9076;
+    var vt = typeof m.value_log_tvl === 'number' ? m.value_log_tvl : 0.4649;
+    var vg = typeof m.value_growth === 'number' ? m.value_growth : -2.8915;
+    var va = typeof m.value_log_age === 'number' ? m.value_log_age : -0.1769;
+    var oc = typeof m.odds_const === 'number' ? m.odds_const : -3.771;
+    var ot = typeof m.odds_log_tvl === 'number' ? m.odds_log_tvl : 0.045;
+    var oa = typeof m.odds_log_age === 'number' ? m.odds_log_age : 0.51;
+    var unk = typeof m.unknown_age_days === 'number' ? m.unknown_age_days : 365;
+    var age = (row.age_days === null || row.age_days === undefined) ? unk : Math.max(1, row.age_days);
+    var g = (row.change_7d === null || row.change_7d === undefined) ? 0 : Math.min(120, Math.max(-60, row.change_7d));
+    var ifLaunch = Math.max(1, Math.round(Math.exp(vc + vt * Math.log(Math.max(1, row.tvl_usd)) + vg * (g / 100) + va * Math.log(age))));
+    var logit = oc + ot * Math.log(Math.max(1, row.tvl_usd)) + oa * Math.log(age);
+    var odds = 1 / (1 + Math.exp(-logit));
+    odds = Math.min(0.95, Math.max(0.05, odds));
+    var implied = Math.max(1, Math.round(ifLaunch * odds));
+    return { ifLaunch: ifLaunch, odds: odds, implied: implied };
+  }
+
   var dialog = document.getElementById('detail');
   function openDetail(slug) {
     var row = null;
@@ -363,11 +400,11 @@
     var capital = (typeof row.farm_cost_usd === 'number' && isFinite(row.farm_cost_usd)) ? row.farm_cost_usd : capitalFor(row);
     var gas = (typeof row.farm_gas_usd === 'number' && isFinite(row.farm_gas_usd)) ? row.farm_gas_usd : (capital >= 150 ? 8 : 4);
     var hold = holdDaysFor(row.age_days);
-    var fitted = fittedMultiple(row);
-    var growth = growthMult(row);
-    var maturity = maturityMult(row);
     var odds = tokenOdds(row);
+    var net = netOf(row);
     var steps = farmSteps(row);
+    var re = recompute(row);
+    var same = Math.abs(re.implied - row.implied_value_usd) <= Math.max(1, row.implied_value_usd * 0.001);
     dialog.textContent = '';
     dialog.appendChild(el('div', { class: 'detail-head' },
       el('div', null,
@@ -379,27 +416,20 @@
     ));
     dialog.appendChild(el('div', { class: 'verdict-line' },
       verdictBadge(row.verdict || null),
-      el('span', { class: 'sub', text: 'Deposit $' + capital + ' · gas ~$' + gas + ' · hold ' + hold + ' days' })
+      el('span', { class: 'sub', text: 'Net ' + fmtNet(net) + ' on $1,000 · deposit $' + capital + ' · gas ~$' + gas + ' · hold ' + hold + ' days' })
     ));
-    var recompute = null;
-    if (odds !== null) {
-      var re = Math.max(1, Math.round(row.tvl_usd * fitted * growth * odds));
-      // The stored multipliers are rounded to 4 decimals, so the recompute can differ
-      // from the board's exact integer by a hair. Within 0.1% it is the same number.
-      var same = Math.abs(re - row.implied_value_usd) <= Math.max(1, row.implied_value_usd * 0.001);
-      recompute = el('p', { class: 'sub', text: 'The page recomputes this row as ' + fmtUsd(re) + (same ? ', the same number the board carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' });
-    }
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Model breakdown' }),
       el('div', { class: 'equation' },
         el('div', null, el('span', { text: 'TVL' }), el('b', { class: 'num', text: fmtUsd(row.tvl_usd) })),
-        el('div', null, el('span', { text: 'Fitted multiple (' + catOf(row) + ')' }), el('b', { class: 'num', text: fitted.toFixed(3) + '×' })),
-        el('div', null, el('span', { text: 'Growth multiplier' }), el('b', { class: 'num', text: growth.toFixed(2) + '×' })),
-        el('div', null, el('span', { text: 'Maturity multiplier (flat)' }), el('b', { class: 'num', text: maturity.toFixed(2) + '×' })),
+        el('div', null, el('span', { text: 'Seven-day growth' }), el('b', { class: 'num', text: fmtPct(row.change_7d) })),
+        el('div', null, el('span', { text: 'Age with no token' }), el('b', { class: 'num', text: fmtAge(row.age_days) })),
+        el('div', null, el('span', { text: 'Value if it launches' }), el('b', { class: 'num', text: fmtUsd(row.if_launches_usd) })),
         el('div', null, el('span', { text: 'Token odds' }), el('b', { class: 'num', text: odds === null ? 'n/a' : Math.round(odds * 100) + '%' })),
-        el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) }))
+        el('div', null, el('span', { text: 'Implied value' }), el('b', { class: 'num', text: fmtUsd(row.implied_value_usd) })),
+        el('div', null, el('span', { text: 'Net on a $1,000 ticket' }), el('b', { class: 'num', text: fmtNet(net) }))
       ),
-      recompute
+      el('p', { class: 'sub', text: 'The page recomputes this row as ' + fmtUsd(re.implied) + (same ? ', the same number the board carries.' : ', which differs from the board: the data would be stale.') + ' This is an estimate, not a price.' })
     ));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
@@ -453,4 +483,15 @@
   });
 
   render();
+
+  // Deep link: #p=<slug> opens that protocol's detail view on load.
+  (function () {
+    var m = /[#&]p=([^&]+)/.exec(window.location.hash || '');
+    if (m) {
+      var slug = decodeURIComponent(m[1]);
+      var found = null;
+      DATA.rows.forEach(function (r) { if (r.slug === slug) found = r; });
+      if (found) openDetail(slug);
+    }
+  })();
 })();
