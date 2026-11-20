@@ -14,160 +14,83 @@
     <div class="top-meta">
       <span>Snapshot <b id="snap-date">—</b></span>
       <span>Model <b id="model-ver">—</b></span>
-      <span id="source-note">DefiLlama protocol index</span>
+      <span>DefiLlama protocol index</span>
     </div>
   </header>
+  <p class="headline">198 protocols record no token. Here is what each launch would be worth, and whether farming it pays.</p>
+  <p class="formula">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × token odds — carry = 1 + 0.01 × clip(7d, ±25%), stated, not fitted.</p>
+  <div class="kpis" id="kpis"></div>
+  <p class="farmnext" id="farmnext"></p>
+  <p class="integrity" id="integrity" hidden>Integrity: checking the table against its own arithmetic…</p>
 
-  <main id="main">
-    <p class="formula-line">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × token odds</p>
-    <p class="formula-note">Growth carry = 1 + 0.01 × clip(7-day TVL change, ±25%) — a stated projection, not a fit.</p>
-
-    <p class="strip" aria-label="Coverage and model fit">Watchlist <b id="kpi-watchlist">—</b> · Board <b id="kpi-board">—</b> · Live <b id="kpi-live">—</b> · LOO <b id="kpi-loo">—</b> · WF <b id="kpi-loo-sub">—</b> · Brier <b id="kpi-brier">—</b> (base <span id="kpi-brier-sub">—</span>) · P25–P75 hit <b id="kpi-range">—</b> (stated 50%) · P10–P90 <span id="kpi-range-sub">—</span> (stated 80%)</p>
-    <p class="integrity" id="integrity">Integrity: checking the table against its own arithmetic…</p>
-
-    <section class="cover-evidence" aria-label="Held-out evidence">
-      <p class="cover-label">Held-out evidence — every term tested leave-one-out and walk-forward on the 128 live comps</p>
-      <table class="evidence cover-table">
+  <section class="evidence3" aria-label="Evidence">
+    <div class="ev-col">
+      <h2>Held-out evidence</h2>
+      <p class="sub">Each term tested LOO and walk-forward on the 128 live comps.</p>
+      <table class="evidence" id="cover-evidence">
         <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">Kept</th></tr></thead>
         <tbody id="cover-evidence-body"></tbody>
       </table>
-    </section>
+    </div>
+    <div class="ev-col">
+      <h2>Market cap vs TVL</h2>
+      <p class="sub">Live comps, the size curve, and the board.</p>
+      <div id="scatter" role="img" aria-label="Scatter plot of market cap against TVL with the fitted size curve"></div>
+    </div>
+  </section>
 
-    <section class="controls" aria-label="Board controls">
-      <div class="field">
-        <label for="q">Search</label>
-        <input type="search" id="q" placeholder="Name, slug, category or chain" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="cat">Category</label>
-        <select id="cat"><option value="all">All categories</option></select>
-      </div>
-      <div class="field">
-        <label for="chain">Chain</label>
-        <select id="chain"><option value="all">All chains</option></select>
-      </div>
-      <div class="field">
-        <label for="odds">Token odds</label>
-        <select id="odds">
-          <option value="0">Any</option>
-          <option value="0.25">&gt;= 25%</option>
-          <option value="0.5">&gt;= 50%</option>
-          <option value="0.75">&gt;= 75%</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="verdict">Verdict</label>
-        <select id="verdict">
-          <option value="all">All</option>
-          <option value="farm">farm</option>
-          <option value="thin">thin</option>
-          <option value="skip">skip</option>
-        </select>
-      </div>
-      <div class="field">
-        <span class="field-label" id="tab-label">Token status</span>
-        <div class="tabs" role="group" aria-labelledby="tab-label">
-          <button type="button" id="tab-pre" aria-pressed="true">Pre-token</button>
-          <button type="button" id="tab-live" aria-pressed="false">Live token</button>
-        </div>
-      </div>
-      <span class="count" id="count" aria-live="polite"></span>
-    </section>
+  <div class="controls" id="controls">
+    <label class="field"><span class="field-label">Search</span><input id="q" type="search" placeholder="Name, slug, category or chain" autocomplete="off"></label>
+    <label class="field"><span class="field-label">Category</span><select id="cat"><option value="all">All categories</option></select></label>
+    <label class="field"><span class="field-label">Chain</span><select id="chain"><option value="all">All chains</option></select></label>
+    <label class="field"><span class="field-label">Token odds</span><select id="odds"><option value="0">Any</option><option value="0.25">&gt;= 25%</option><option value="0.5">&gt;= 50%</option><option value="0.75">&gt;= 75%</option></select></label>
+    <label class="field"><span class="field-label">Verdict</span><select id="verdict"><option value="all">All</option><option value="farm">Farm</option><option value="thin">Thin</option><option value="skip">Skip</option></select></label>
+    <div class="field"><span class="field-label">Token status</span><div class="seg" id="tab"><button type="button" data-tab="pre" class="on">Pre-token</button><button type="button" data-tab="live">Live</button></div></div>
+    <div class="field whatif"><span class="field-label">Ticket size</span><div class="seg" id="ticket"><button type="button" data-v="1000" class="on">$1,000</button><button type="button" data-v="5000">$5,000</button><button type="button" data-v="25000">$25,000</button></div></div>
+    <div class="field whatif"><span class="field-label">Drop share</span><div class="seg" id="share"><button type="button" data-v="0.035">3.5%</button><button type="button" data-v="0.07" class="on">7%</button><button type="button" data-v="0.14">14%</button></div></div>
+    <div class="field whatif"><span class="field-label">Hold horizon</span><div class="seg" id="horizon"><button type="button" data-v="model" class="on">Model</button><button type="button" data-v="30">30d</button><button type="button" data-v="60">60d</button><button type="button" data-v="90">90d</button></div></div>
+  </div>
+  <p class="sub" id="whatif-summary" hidden></p>
+  <p class="count" id="count"></p>
 
-    <div id="board-wrap" tabindex="-1"></div>
+  <div class="table-wrap" id="board-wrap"><table id="board"></table></div>
 
-    <section class="panel whatif" aria-labelledby="whatif-title">
-      <h2 id="whatif-title">What-if: re-price the board at your size</h2>
-      <div class="whatif-grid">
-        <fieldset>
-          <legend>Ticket size</legend>
-          <div class="seg" role="group" aria-label="Ticket size">
-            <button type="button" data-ticket="1000" aria-pressed="true">$1,000</button>
-            <button type="button" data-ticket="5000" aria-pressed="false">$5,000</button>
-            <button type="button" data-ticket="25000" aria-pressed="false">$25,000</button>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Drop share of implied value</legend>
-          <div class="seg" role="group" aria-label="Drop share">
-            <button type="button" data-share="0.035" aria-pressed="false">3.5%</button>
-            <button type="button" data-share="0.07" aria-pressed="true">7%</button>
-            <button type="button" data-share="0.14" aria-pressed="false">14%</button>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Hold horizon</legend>
-          <div class="seg" role="group" aria-label="Hold horizon">
-            <button type="button" data-horizon="model" aria-pressed="true">Model hold</button>
-            <button type="button" data-horizon="30" aria-pressed="false">30 days</button>
-            <button type="button" data-horizon="60" aria-pressed="false">60 days</button>
-            <button type="button" data-horizon="90" aria-pressed="false">90 days</button>
-          </div>
-        </fieldset>
-      </div>
-      <p class="whatif-summary" id="whatif-summary" aria-live="polite"></p>
-    </section>
-
-    <section class="panel ledger" aria-labelledby="ledger-title">
-      <h2 id="ledger-title">Protocol accounting</h2>
-      <p class="sub">All 758 snapshot protocols in exactly one group. The board ranks the pre-token
-      protocols; the rest are comparables or set aside by the house rules.</p>
-      <div class="ledger-bar" id="ledger-bar" aria-hidden="true"></div>
-      <div class="table-wrap">
-        <table class="ledger-table">
-          <thead><tr><th scope="col">Group</th><th scope="col">Count</th><th scope="col">Why</th></tr></thead>
-          <tbody id="ledger-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel model" aria-labelledby="model-title">
-      <h2 id="model-title">How implied value is computed</h2>
-      <p class="sub">One function scores every row. No protocol name is special-cased, and no row
-      is hand-picked. Growth and age are not fitted into the value: growth enters only as a bounded
-      carry, a stated projection, and age enters only through the token odds.</p>
-      <div class="formula">if it launches = exp(6.9646 + 0.5223 x ln(TVL) + category_effect)
+  <section class="panel" id="model-panel">
+    <h2>How implied value is computed</h2>
+    <p class="sub">One function scores every row. No protocol name is special-cased, and no row is hand-picked. Growth and age are not fitted into the value: growth enters only as a bounded carry, a stated projection, and age enters only through the token odds.</p>
+    <pre class="formula-block">if it launches = exp(6.9646 + 0.5223 x ln(TVL) + category_effect)
 growth carry = 1 + 0.01 x clip(change_7d, -25%, +25%)  — a stated projection, not a fit
 token odds = logistic(0.1959 + 0.1682 x z(ln TVL) + 0.4281 x z(ln age, floored 365d) + category odds effect - 2.5 if a parent protocol already has a token), clipped 0.05–0.95
 implied = if it launches x growth carry x token odds
-net on a ticket = implied x drop share x (ticket / TVL) - gas - ticket x 4% x (hold / 365)</div>
-      <h3>Out-of-sample evidence</h3>
-      <p class="sub">Each term is kept only if it lowers the held-out miss on both tests:
-      leave-one-out on the 128 live-token protocols with a positive market cap, and walk-forward
-      (older-listed protocols predict newer-listed ones). The flat median multiple is the baseline.
-      Growth and age were tested in the value model and dropped — neither helped. The family effect
-      lives in the odds, not the value: only 2 live comps are family children, so it cannot move
-      the value fit.</p>
-      <div class="table-wrap">
-        <table class="evidence">
-          <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">LOO MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead>
-          <tbody id="evidence-body"></tbody>
-        </table>
-      </div>
-      <h3>Category effects on value</h3>
-      <p class="sub">The value model's category effect in log points, and the multiple it applies
-      to the size curve. Shrunk toward zero (prior weight 10) and capped at ±1.0, from the live
-      comparables in each category. Categories with no live comps get 0.</p>
-      <div class="table-wrap">
-        <table class="cats">
-          <thead><tr><th scope="col">Category</th><th scope="col">Effect (log pts)</th><th scope="col">Multiple</th><th scope="col">Board rows</th></tr></thead>
-          <tbody id="cats-body"></tbody>
-        </table>
-      </div>
-      <h3>Held-out validation</h3>
-      <p>Fitted and tested on the 128 live-token protocols with a positive market cap.
-      Leave-one-out miss ×3.39, walk-forward miss ×2.96 — against ×5.09 / ×5.33 for a flat median
-      multiple. Token odds: in-sample Brier 0.209 against a 0.249 base rate, walk-forward 0.213.
-      The board prints the middle-50% range (P25–P75, about 12× wide, 50.8% of live comps land
-      inside it); the detail view also shows the wide P10–P90 range (about 123× wide, 79.7%
-      inside). This model ranks, it does not price — implied values are order-of-magnitude scores
-      with ~3.4× typical error, and the range on each row says so.</p>
-    </section>
-  </main>
+net on a ticket = implied x drop share x (ticket / TVL) - gas - ticket x 4% x (hold / 365)
+FARM = token odds ≥ 50% and net &gt; 0 at the ticket</pre>
+    <h3>Out-of-sample evidence</h3>
+    <p class="sub">Each term is kept only if it lowers the held-out miss on both tests: leave-one-out on the 128 live-token protocols with a positive market cap, and walk-forward (older-listed protocols predict newer-listed ones). The flat median multiple is the baseline. Growth and age were tested in the value model and dropped — neither helped. The family effect lives in the odds, not the value: only 2 live comps are family children, so it cannot move the value fit.</p>
+    <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">LOO MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead><tbody id="evidence-body"></tbody></table></div>
+    <h3>Category effects on value</h3>
+    <p class="sub">The value model's category effect in log points, and the multiple it applies to the size curve. Shrunk toward zero (prior weight 10) and capped at ±1.0, from the live comparables in each category. Categories with no live comps get 0.</p>
+    <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Category</th><th scope="col">Effect (log pts)</th><th scope="col">Multiple</th><th scope="col">Board rows</th></tr></thead><tbody id="cats-body"></tbody></table></div>
+    <h3>Held-out validation</h3>
+    <p class="sub" id="validation-note"></p>
+    <h3>Odds &amp; ranges</h3>
+    <div id="odds-evidence"></div>
+  </section>
+
+  <section class="panel" id="ledger-panel">
+    <h2>Protocol accounting</h2>
+    <p class="sub">All 758 snapshot protocols in exactly one group. The board ranks the pre-token protocols; the rest are comparables or set aside by the house rules.</p>
+    <div class="ledger-bar" id="ledger-bar"></div>
+    <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Group</th><th scope="col">Count</th><th scope="col">Why</th></tr></thead><tbody id="ledger-body"></tbody></table></div>
+  </section>
+
+  <section class="panel" id="live-panel">
+    <h2>Live-token comparables</h2>
+    <p class="sub">Market facts, not a model: these protocols already trade, so their market cap is the market's own value. They are the comparables the size curve was fitted to, set aside from the pre-token ranking.</p>
+    <div class="table-wrap"><table class="evidence" id="live-table"></table></div>
+  </section>
 </div>
 
-<dialog id="detail" class="detail" aria-labelledby="detail-title"></dialog>
-
+<div class="detail-page" id="detail" hidden></div>
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
