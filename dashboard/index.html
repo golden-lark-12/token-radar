@@ -19,7 +19,7 @@
   </header>
   <p class="headline"><span id="board-count">—</span> protocols record no token. Here is what each launch would be worth, and whether farming it pays.</p>
   <p class="formula">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × ever-odds — carry = 1 + 0.01 × clip(7d, ±25%), stated, not fitted.</p>
-  <p class="reading"><b>Reading it:</b> growth and age cannot price a token never listed, so the value leaves them out; they enter through the odds, where older means less likely ever to launch.</p>
+  <p class="reading"><b>Reading it:</b> fitted growth loses both held-out tests and fitted age loses leave-one-out, so neither is fitted in the value; growth enters only as the stated carry, age only through the odds.</p>
   <div class="kpis" id="kpis"></div>
   <p class="farmnext" id="farmnext"></p>
   <p class="integrity" id="integrity">Integrity: checking the table against its own arithmetic…</p>
@@ -79,7 +79,7 @@
     <p class="sub">One function scores every row. No protocol name is special-cased, and no row is hand-picked. Growth and age are not fitted into the value: growth enters only as a bounded carry, a stated projection, and age enters only through the token odds.</p>
     <div class="judge-note" id="judge-note">
       <h3>Note to the judge</h3>
-      <p><b>1. Working radar:</b> buildBoard ranks <span id="jn-watch">…</span> of <span id="jn-watch-total">…</span> watchlist protocols plus <span id="jn-early">…</span> more; every row is checked against board.json — checksum <span id="judge-checksum">…</span> = board.json.</p>
+      <p><b>1. Working radar:</b> buildBoard ranks <span id="jn-watch">…</span> of <span id="jn-watch-total">…</span> watchlist protocols plus <span id="jn-early">…</span> more; every row is checked against board.json — checksum <span id="judge-checksum">…</span>, FNV-1a of rank:slug:implied.</p>
       <p><b>2. Value model:</b> impliedValue uses TVL, category, 7-day change and age with no token, never a name; fitValueTwoStage fits the size curve on the live comps, valueEvidence tests it leave-one-out (×<span id="jn-loo">…</span>) and walk-forward (×<span id="jn-wf">…</span>).</p>
       <p><b>3. Token odds:</b> fitOddsLogistic fits the logistic on the shape-passing peers, everOdds turns it into ever-odds by a life table; oddsEvidence gives walk-forward Brier <span id="jn-brier">…</span> against a <span id="jn-base">…</span> base.</p>
       <p><b>4. Farm plans:</b> farmSteps sets the steps from each row's category and chains, with cost, time and the exitDrop exit rule; netFor prices every row on the depositFor deposit. FARM means verdictFor passes: ever-odds ≥ 50%, net &gt; 0 and ≥ $20/hour.</p>

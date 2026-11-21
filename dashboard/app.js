@@ -161,7 +161,7 @@
     var p = document.getElementById('integrity');
     p.textContent = '';
     p.appendChild(el('b', { text: 'Integrity: ' }));
-    p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total ' + money(total) + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' = board.json'));
+    p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total ' + money(total) + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' (FNV-1a of rank:slug:implied)'));
   })();
 
   // ---- protocol accounting bar on the cover ----
@@ -353,6 +353,8 @@
     var strip = document.getElementById('league-strip');
     if (S.tab === 'live') {
       strip.hidden = true;
+      var liveEvidence = document.getElementById('evidence-section');
+      if (liveEvidence) liveEvidence.classList.remove('view-hidden');
       var live = liveFiltered();
       var head = el('thead', null, el('tr', null, ['Protocol', 'Category', 'TVL', 'Market cap', '7d', 'Mcap / TVL'].map(function (h, i) { return el('th', { scope: 'col', class: i >= 2 ? 'num' : '', text: h }); })));
       var tb = el('tbody');
@@ -389,6 +391,11 @@
     var sortLabel = S.sort === 'rank' ? 'rank' : (S.sort === 'net' ? 'net/hour' : (S.sort === 'implied' ? 'implied value' : (S.sort === 'tvl' ? 'TVL' : (S.sort === 'odds' ? 'token odds' : (S.sort === 'growth' ? '7d change' : 'age')))));
     // Category league strip, computed from the board, on filtered views:
     // leagues with at least 3 rows in view, plus a count of the smaller ones.
+    // On a filtered view the evidence block is hidden, and the leagues
+    // render as a compact table instead of running text.
+    var evidenceSec = document.getElementById('evidence-section');
+    var isFilteredView = list.length > 0 && list.length !== DATA.rows.length;
+    if (evidenceSec) evidenceSec.classList.toggle('view-hidden', isFilteredView);
     if (list.length && list.length !== DATA.rows.length) {
       var shownCats = {};
       list.forEach(function (x) { shownCats[catOf(x.r)] = true; });
@@ -396,12 +403,23 @@
       var smallCount = (DATA.leagues || []).filter(function (g) { return shownCats[g.category] && g.rows < 3; }).length;
       strip.textContent = '';
       strip.hidden = leagues.length === 0 && smallCount === 0;
-      strip.appendChild(el('b', { text: 'Category leagues: ' }));
-      leagues.forEach(function (g, i) {
-        if (i) strip.appendChild(document.createTextNode(' · '));
-        strip.appendChild(document.createTextNode(g.category + ': ' + g.rows + ' rows · ' + g.peers_tokened + '/' + g.peers + ' peers record a token (' + (g.ever_pct * 100).toFixed(0) + '%) · median premium ×' + g.median_premium.toFixed(2)));
+      strip.appendChild(el('b', { text: 'Category leagues' }));
+      var leagueTable = el('table', { class: 'leagues-table' });
+      var leagueHead = el('thead', null, el('tr', null, ['Category', 'Rows', 'Peers with token', 'Ever %', 'Median premium'].map(function (h, i) { return el('th', { scope: 'col', class: i > 0 ? 'num' : '', text: h }); })));
+      var leagueBody = el('tbody');
+      leagues.forEach(function (g) {
+        leagueBody.appendChild(el('tr', null, [
+          el('td', { text: g.category }),
+          el('td', { class: 'num', text: String(g.rows) }),
+          el('td', { class: 'num', text: g.peers_tokened + '/' + g.peers }),
+          el('td', { class: 'num', text: (g.ever_pct * 100).toFixed(0) + '%' }),
+          el('td', { class: 'num', text: '×' + g.median_premium.toFixed(2) }),
+        ]));
       });
-      if (smallCount) strip.appendChild(document.createTextNode(' · ' + smallCount + ' more league' + (smallCount === 1 ? '' : 's') + ' with 1–2 rows each'));
+      leagueTable.appendChild(leagueHead);
+      leagueTable.appendChild(leagueBody);
+      strip.appendChild(leagueTable);
+      if (smallCount) strip.appendChild(el('p', { class: 'sub', text: smallCount + ' more league' + (smallCount === 1 ? '' : 's') + ' with 1–2 rows each' }));
     } else {
       strip.hidden = true;
     }
@@ -472,13 +490,15 @@
     vSel.options[3].text = 'Skip (' + fc.skip + ')';
     setText('rank-legend', 'Rank range: P10–P90 from 200 bootstrap refits (bootstrapRankRanges), widened to include the row’s own rank.');
     // Filtered-set aggregates: what farming the whole shown set would do.
+    // The net is the sum of the rounded per-row nets, so the total reads
+    // exactly as the rows beside it add up.
     var st = document.getElementById('settotals');
     st.textContent = '';
     if (list.length && list.length !== DATA.rows.length) {
-      var tvlSum = 0, impSum = 0, netSum = 0, hourSum = 0;
-      list.forEach(function (x) { tvlSum += x.r.tvl_usd; impSum += x.r.implied_value_usd; netSum += x.p.net; hourSum += x.p.hours; });
+      var tvlSum = 0, impSum = 0, netCents = 0, hourSum = 0;
+      list.forEach(function (x) { tvlSum += x.r.tvl_usd; impSum += x.r.implied_value_usd; netCents += Math.round(x.p.net * 100); hourSum += x.p.hours; });
       st.appendChild(el('b', { text: 'Farming all ' + list.length + ' shown at ' + depositLabel() + ' each nets ' }));
-      st.appendChild(document.createTextNode(signed(netSum) + ' for ' + hourSum.toFixed(1) + ' h of work · ' + money(tvlSum) + ' TVL · ' + money(impSum) + ' implied in view'));
+      st.appendChild(document.createTextNode(signed(netCents / 100) + ' for ' + hourSum.toFixed(1) + ' h of work · ' + money(tvlSum) + ' TVL · ' + money(impSum) + ' implied in view'));
     }
   }
 
@@ -539,22 +559,34 @@
     inner.appendChild(el('div', null, [badge(v), r.guard_reason ? el('span', { class: 'guard', text: ' ' + r.guard_reason }) : null,
       el('span', { class: 'sub', text: ' Deposit $' + p.deposit.toLocaleString('en-US') + ' · gas ~$' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' · hold ' + p.hold + ' days' })]));
     inner.appendChild(el('div', { class: 'eqbar' }, [el('b', { text: 'Drop − fees ' + signed(p.dropFees) + ' − T-bill forgone ' + money2(p.tbill) + ' = net ' + signed(p.net) + ', ' + signed(p.nph) + ' an hour. ' }), document.createTextNode(p.beT !== null ? 'Pays from a $' + p.beT.toLocaleString('en-US') + ' ticket.' : 'No ticket size pays: the slice per dollar is below the T-bill rate.')]));
-    // 3. Farm plan steps, with cost and time on every step.
+    // The same row's verdict at each fixed deposit, priced live by
+    // price() and verdict() rather than printed from a stored table.
+    var savedDeposit = S.deposit;
+    var depositVerdicts = [1000, 5000, 10000, 25000].map(function (d) {
+      S.deposit = d;
+      return '$' + d.toLocaleString('en-US') + ' ' + verdict(r, price(r)).toUpperCase();
+    });
+    S.deposit = savedDeposit;
+    inner.appendChild(el('p', { class: 'sub', text: 'Verdict by deposit: ' + depositVerdicts.join(' · ') + '.' }));    // 3. Farm plan steps, with cost and time on every step.
     inner.appendChild(el('h3', { text: 'Farm plan' }));
     var steps = el('ol', { class: 'steps' });
     (r.farm_steps || []).forEach(function (s) {
       steps.appendChild(el('li', null, [el('b', { text: s.text }), el('span', { class: 'cost', text: 'Cost: ' + s.cost + ' · Time: ' + s.time })]));
     });
     inner.appendChild(steps);
-    // 4. Week 0–12 timeline, drawn from the step times.
+    // 4. Week 0–12 timeline, drawn from the step times: the weekly checks
+    // fall on days 7, 14, 21 and 28 of a 30-day hold, and the claim lands
+    // on the hold's last day.
     inner.appendChild(el('h3', { text: 'Week 0–12 timeline' }));
-    var weeks = Math.ceil(p.hold / 7);
+    var checkCount = Math.floor(p.hold / 7);
+    var checkDays = [];
+    for (var cd = 7; cd <= p.hold; cd += 7) checkDays.push(cd);
     var timeline = el('div', { class: 'timeline' });
     timeline.appendChild(el('span', { class: 'hot', text: 'Week 0 · setup, 15 min' }));
-    timeline.appendChild(el('span', { text: 'Weeks 1–' + weeks + ' · 10-minute weekly check, exit rule watched' }));
+    timeline.appendChild(el('span', { text: 'Days ' + checkDays.join(', ') + ' · ' + checkCount + ' weekly checks, 10 min each, exit rule watched' }));
     timeline.appendChild(el('span', { class: 'hot', text: 'Day ' + p.hold + ' · claim, 10 min' }));
     inner.appendChild(timeline);
-    inner.appendChild(el('p', { class: 'sub', text: 'Setup at week 0, weekly checks through week ' + weeks + ', claim at the hold end (day ' + p.hold + '). Step times add up to ' + p.hours.toFixed(2) + ' hours.' }));
+    inner.appendChild(el('p', { class: 'sub', text: 'Setup at week 0, ' + checkCount + ' weekly checks on days ' + checkDays[0] + '–' + checkDays[checkDays.length - 1] + ', claim at the hold end (day ' + p.hold + '). Step times add up to ' + p.hours.toFixed(2) + ' hours.' }));
     // 5. Plan totals.
     var totalFees = (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + p.tbill;
     inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps over ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees and forgone yield · ' + p.hours.toFixed(1) + ' h of hands-on work · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
