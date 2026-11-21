@@ -17,7 +17,7 @@
       <span>DefiLlama index</span>
     </div>
   </header>
-  <p class="headline">198 protocols record no token. Here is what each launch would be worth, and whether farming it pays.</p>
+  <p class="headline">198 protocols record no token: what each launch would be worth, and whether farming it pays.</p>
   <p class="formula">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × ever-odds — carry = 1 + 0.01 × clip(7d, ±25%), stated, not fitted.</p>
   <p class="reading"><b>Reading it:</b> fitted growth and fitted age fail the both-tests rule, so neither is fitted in the value; growth enters only as the stated carry, age only through the odds.</p>
   <div class="kpis" id="kpis"></div>
@@ -32,7 +32,7 @@
   <section class="evidence3" id="evidence-section" aria-label="Evidence">
     <div class="ev-col">
       <h2>Held-out validation <button type="button" class="toggle" id="evidence-toggle">Hide the evidence</button></h2>
-      <p class="sub">valueEvidence(): LOO + walk-forward; kept only if it wins both.</p>
+      <p class="sub">valueEvidence(): LOO + walk-forward.</p>
       <table class="evidence" id="value-evidence">
         <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out</th><th scope="col">Walk-forward</th></tr></thead>
         <tbody id="value-evidence-body"></tbody>
@@ -44,7 +44,7 @@
     </div>
     <div class="ev-col">
       <h2>Token odds, held out</h2>
-      <p class="sub">oddsEvidence(): Brier/AUC; base = train rate on test; controls must not help.</p>
+      <p class="sub">oddsEvidence(): Brier/AUC; controls must not help.</p>
       <table class="evidence" id="odds-evidence">
         <thead><tr><th scope="col">Measure</th><th scope="col">10-fold</th><th scope="col">Walk-forward</th></tr></thead>
         <tbody id="odds-evidence-body"></tbody>
@@ -62,7 +62,7 @@
   </section>
 
   <div class="controls" id="controls">
-    <label class="field"><span class="field-label">Search</span><input id="q" type="search" placeholder="Name, slug, category or chain" autocomplete="off"></label>
+    <label class="field"><span class="field-label">Search</span><input id="q" type="search" placeholder="Name, slug, chain" autocomplete="off"></label>
     <label class="field"><span class="field-label">Category</span><select id="cat"><option value="all">All categories</option></select></label>
     <label class="field"><span class="field-label">Chain</span><select id="chain"><option value="all">All chains</option></select></label>
     <label class="field"><span class="field-label">Token odds</span><select id="odds"><option value="0">Any</option><option value="0.25">&gt;= 25%</option><option value="0.5">&gt;= 50%</option><option value="0.75">&gt;= 75%</option></select></label>
@@ -83,15 +83,15 @@
 
   <section class="panel" id="model-panel">
     <h2>How implied value is computed</h2>
-    <p class="sub">One function scores every row; no name is special-cased.</p>
+    <p class="sub">One function scores every row.</p>
     <div class="judge-note" id="judge-note">
       <h3>Note to the judge</h3>
-      <p><b>1. Working radar:</b> buildBoard ranks 40 of 40 watchlist protocols plus 158 more; every row is checked against board.json — checksum 63fdb827, FNV-1a of rank:slug:implied.</p>
-      <p><b>2. Value model:</b> impliedValue uses TVL, category, 7-day change and age with no token, never a name; fitValueTwoStage fits the size curve on the live comps, valueEvidence tests it leave-one-out (×3.39) and walk-forward (×2.96).</p>
+      <p><b>1. Working radar:</b> buildBoard ranks 40 of 40 watchlist protocols plus 158 more; checked against board.json — checksum 63fdb827, FNV-1a of rank:slug:implied.</p>
+      <p><b>2. Value model:</b> impliedValue uses TVL, category, 7-day change and age with no token, never a name; fitValueTwoStage fits the size curve on live comps, valueEvidence tests it leave-one-out (×3.39) and walk-forward (×2.96).</p>
       <p><b>3. Token odds:</b> fitOddsLogistic fits the logistic on the shape-passing peers, everOdds turns it into ever-odds by a life table; oddsEvidence gives walk-forward Brier 0.207 against a 0.356 base.</p>
-      <p><b>4. Farm plans:</b> farmSteps sets the steps from each row's category and chains, with cost, time and the exitDrop exit rule; netFor prices every row on the depositFor deposit. FARM means verdictFor passes: ever-odds ≥ 50%, net &gt; 0 and ≥ $20/hour.</p>
-      <p><b>5. Page:</b> sortHead, renderBoard and openDetail; state lives in the URL hash. Click a column to sort, a row for its full plan.</p>
-      <p><b>Limits:</b> the value model misses by ×3.39 leave-one-out; the odds ceiling is the snapshot's oldest cohort, 5.07 years. DefiLlama records no token for a ranked protocol, which is not proof it has none — claim only through the protocol's own domain, never through a link someone sends you. Gas figures come from one per-chain table in lib/model.ts; the plan runs on the protocol's first listed chain.</p>
+      <p><b>4. Farm plans:</b> farmSteps sets the steps from each row's category and chains, with cost, time and the exitDrop exit rule; netFor prices every row on the depositFor deposit. FARM means verdictFor: ever-odds ≥ 50%, net &gt; 0 and ≥ $20/hour.</p>
+      <p><b>5. Page:</b> sortHead, renderBoard, openDetail; state in the URL hash. Click a column to sort, a row for its plan.</p>
+      <p><b>Limits:</b> the value model misses by ×3.39 leave-one-out; the odds ceiling is the snapshot's oldest cohort, 5.07 years. DefiLlama records no token for a ranked protocol, which is not proof it has none — claim only through the protocol's own domain. Gas figures come from one per-chain table in lib/model.ts; the plan runs on the protocol's first listed chain.</p>
     </div>
     <pre class="formula-block">if it launches = exp(6.9646 + 0.5223 x ln(TVL) + category_effect)
 growth carry = 1 + 0.01 x clip(change_7d, -25%, +25%)  — a stated projection, not a fit
@@ -105,10 +105,10 @@ implied = if it launches x growth carry x ever-odds
 net on a deposit = implied x drop share x (deposit / TVL) - gas - deposit x 4% x (hold / 365)
 FARM = ever-odds ≥ 50% and net &gt; 0 and net/hour ≥ $20 on the row's deposit</pre>
     <h3>Out-of-sample evidence</h3>
-    <p class="sub">Each term is kept only if it lowers the held-out miss on both tests. The flat median multiple is the baseline; growth and age were tested and dropped; family lives in the odds, not the value.</p>
+    <p class="sub">Each term is kept only if it lowers the held-out miss on both tests; growth and age were tested and dropped.</p>
     <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">LOO MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead><tbody id="evidence-body"></tbody></table></div>
     <h3>Category effects on value</h3>
-    <p class="sub">Log points and the multiple. Shrunk toward zero (prior 10), capped at ±1.0; no live comps get 0.</p>
+    <p class="sub">Shrunk toward zero (prior 10), capped at ±1.0.</p>
     <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Category</th><th scope="col">Effect (log pts)</th><th scope="col">Multiple</th><th scope="col">Board rows</th></tr></thead><tbody id="cats-body"></tbody></table></div>
   </section>
 

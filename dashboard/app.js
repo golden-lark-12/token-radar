@@ -1,4 +1,4 @@
-// Token Radar dashboard. Reads window.RADAR (data.js); every number traces to a field of it. No network.
+// Token Radar dashboard. Reads window.RADAR (data.js); every number traces to a field of it.
 (function () {
   'use strict';
   var DATA = window.RADAR;
@@ -56,7 +56,7 @@
     return '$' + S.deposit.toLocaleString('en-US');
   }
 
-  // Pricing, as in lib/model.ts.
+  // Pricing as in lib/model.ts.
   function price(r) {
     var deposit = S.deposit === 'row' ? r.deposit_usd : S.deposit;
     var hold = S.horizon === 'model' ? (typeof r.hold_days === 'number' ? r.hold_days : 30) : S.horizon;
@@ -71,7 +71,7 @@
     var beO = base > 0 ? (gas + tbill) / base : null;
     return { deposit: deposit, slice: slice, dropFees: slice - gas, tbill: tbill, net: net, nph: net / hours, beT: beT, beO: beO !== null && beO > 0 && beO <= 0.95 ? beO : null, hold: hold, hours: hours };
   }
-  // verdictFor: FARM needs odds, net, $20/h; crash guard demotes/skips falls.
+  // verdictFor: FARM needs odds, net, $20/h; the crash guard demotes or skips falls.
   function verdict(r, p) {
     var g7 = r.change_7d;
     if (g7 !== null && g7 !== undefined && g7 <= -30) return 'skip';
@@ -124,7 +124,6 @@
     });
   })();
 
-  // Integrity check.
   (function () {
     var total = 0, ok = 0, prev = Infinity, ordered = true;
     DATA.rows.forEach(function (r) {
@@ -156,7 +155,6 @@
     setText('ledger-line', sum(ranked) + ' ranked (' + (ranked[0] ? ranked[0].count : 40) + ' watchlist · ' + (ranked[1] ? ranked[1].count : 158) + ' early) · ' + sum(traded) + ' token on record · ' + sum(aside) + ' set aside — every protocol in exactly one group.');
   })();
 
-  // Cover evidence.
   (function () {
     function termByName(part) {
       var found = null;
@@ -189,7 +187,7 @@
         el('td', { text: miss(wf) }),
       ]));
     });
-    setText('value-reasons', '+ growth loses both · + age/+ curvature win WF, lose LOO: fail the both-tests rule · age stays in odds · controls must not help.');
+    setText('value-reasons', '+ growth loses both · + age/+ curvature win WF, lose LOO: fail the both-tests rule · controls must not help.');
     setText('value-cut', 'cut from flat: ' + pct1(FIT.cut_loo) + ' · ' + pct1(FIT.cut_wf) + ' · within ×3: ' + pct1(FIT.w3_loo) + ' · ' + pct1(FIT.w3_wf) + ' (flat ' + pct1(FIT.w3_flat_loo) + ' · ' + pct1(FIT.w3_flat_wf) + ')');
     setText('value-band', 'printed band hits P25–P75 ' + pct1(FIT.mid_loo) + ' · ' + pct1(FIT.mid_wf) + ', P10–P90 ' + pct1(FIT.wide_loo) + ' · ' + pct1(FIT.wide_wf) + ' · slope ' + fmtNum(FIT.value_log_tvl, 3) + ' ± ' + fmtNum(FIT.value_log_tvl_se, 3) + ' (200 bootstrap refits)');
     setText('value-strict', 'Strict refit, train-side bands only: P25–P75 ' + pct1(FIT.mid_strict_loo) + ' · ' + pct1(FIT.mid_strict_wf) + ', P10–P90 ' + pct1(FIT.wide_strict_loo) + ' · ' + pct1(FIT.wide_strict_wf) + '.');
@@ -228,7 +226,6 @@
     });
   })();
 
-  // Cover scatter (log scales).
   (function () {
     var box = document.getElementById('scatter');
     if (!box) return;
@@ -245,13 +242,14 @@
     var cv = function (x) { return Math.exp(M.value_const + M.value_log_tvl * Math.log(x)); };
     var s = '', e, g, p10 = function (k) { return Math.pow(10, k); };
     var xA = Math.ceil(xLo), xB = Math.floor(xHi), yA = Math.ceil(yLo), yB = Math.floor(yHi);
+    var tickMoney = function (v) { return v >= 1e9 ? '$' + (v / 1e9) + 'B' : (v >= 1e5 && v < 1e6 ? '$' + (v / 1e3) + 'K' : money(v)); };
     for (e = xA; e <= xB; e++) {
       g = X(p10(e));
-      s += '<line class="scatter-grid" x1="' + g + '" y1="' + T + '" x2="' + g + '" y2="' + (T + ph) + '"/><text x="' + g + '" y="' + (H - 8) + '" text-anchor="' + (e === xA ? 'start' : (e === xB ? 'end' : 'middle')) + '">' + money(p10(e)) + '</text>';
+      s += '<line class="scatter-grid" x1="' + g + '" y1="' + T + '" x2="' + g + '" y2="' + (T + ph) + '"/><text x="' + g + '" y="' + (H - 8) + '" text-anchor="' + (e === xA ? 'start' : (e === xB ? 'end' : 'middle')) + '">' + tickMoney(p10(e)) + '</text>';
     }
     for (e = yA; e <= yB; e++) {
       g = Y(p10(e));
-      s += '<line class="scatter-grid" x1="' + L + '" y1="' + g + '" x2="' + (L + pw) + '" y2="' + g + '"/><text x="' + (L - 4) + '" y="' + (+g + 3) + '" text-anchor="end">' + money(p10(e)) + '</text>';
+      s += '<line class="scatter-grid" x1="' + L + '" y1="' + g + '" x2="' + (L + pw) + '" y2="' + g + '"/><text x="' + (L - 4) + '" y="' + (+g + 3) + '" text-anchor="end">' + tickMoney(p10(e)) + '</text>';
     }
     var hi = '', lo = '', line = '';
     for (var i = 0; i <= 24; i++) {
@@ -267,7 +265,6 @@
     setText('scatter-note', live.length + ' live comps (blue), ' + rows.length + ' board rows (green). Curve exp(' + M.value_const.toFixed(4) + ' + ' + M.value_log_tvl.toFixed(4) + ' × ln TVL); band ×' + FIT.resid_p25_mult.toFixed(2) + '–×' + FIT.resid_p75_mult.toFixed(2) + '. Board points are after ever-odds.');
   })();
 
-  // Categories, ledger, live.
   (function () {
     var body = document.getElementById('cats-body');
     var counts = {};
@@ -310,7 +307,6 @@
     liveTable.appendChild(tb);
   })();
 
-  // Filters and board.
   (function () {
     var catCounts = {};
     DATA.rows.forEach(function (r) { var c = catOf(r); catCounts[c] = (catCounts[c] ? catCounts[c] : 0) + 1; });
@@ -328,7 +324,7 @@
 
   function planLine(r, p) {
     var step = (r.farm_steps && r.farm_steps[2]) ? r.farm_steps[2].text : '';
-    var verb = (step.match(/^(Deposit|Supply|Provide|Mint|Stake|Bridge|Fund|Buy|Lock|Place|Spend|Use|Try|Join|Claim|Vote|List|Roll|Close|Check|Make|Add|Top|Swap|Rebalance|Withdraw|Restake|Read|Set|Keep|Borrow|Open|Enter|Verify|Put)/) || ['Act'])[0];
+    var verb = (step.match(/^(Deposit|Supply|Provide|Mint|Stake|Bridge|Fund|Buy|Lock|Place|Spend|Pay|Use|Try|Join|Claim|Vote|List|Roll|Close|Check|Make|Add|Top|Swap|Rebalance|Withdraw|Restake|Read|Set|Keep|Borrow|Open|Enter|Verify|Put)/) || ['Act'])[0];
     var chain = (r.chains || [])[0] || 'an unnamed chain';
     return verb + ' · ' + chain + ' · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + p.hours.toFixed(1) + ' h';
   }
@@ -403,7 +399,6 @@
     else if (S.verdict !== 'all') { list.sort(function (a, b) { return b.p.nph - a.p.nph; }); S.sort = 'net'; }
     else list.sort(function (a, b) { return a.r.rank - b.r.rank; });
     var sortLabel = S.sort === 'rank' ? 'rank' : (S.sort === 'net' ? 'net/hour' : (S.sort === 'implied' ? 'implied value' : (S.sort === 'tvl' ? 'TVL' : (S.sort === 'odds' ? 'token odds' : (S.sort === 'growth' ? '7d change' : 'age')))));
-    // Category leagues on filtered views; the evidence block hides there.
     var evidenceSec = document.getElementById('evidence-section');
     var isFilteredView = list.length > 0 && list.length !== DATA.rows.length;
     if (evidenceSec) evidenceSec.classList.toggle('view-hidden', isFilteredView);
@@ -434,7 +429,7 @@
     } else {
       strip.hidden = true;
     }
-    var rankHead = el('th', { scope: 'col', text: 'Rank', title: 'rank range, 200 refits' });
+    var rankHead = el('th', { scope: 'col', text: 'Rank' + (S.sort === 'rank' ? ' ↓' : ' ↕'), title: 'rank range, 200 refits', onclick: function () { S.sort = 'rank'; renderBoard(); } });
     var headRow = el('thead', null, el('tr', null, [
       rankHead,
       el('th', { scope: 'col', text: 'Protocol' }),
@@ -487,18 +482,20 @@
     });
     table.appendChild(headRow);
     table.appendChild(tb2);
-    var note = list.length + ' rows shown · sorted by ' + sortLabel + (isDefault() ? '' : ' · verdicts re-priced at ' + depositLabel());
-    if (S.verdict !== 'all') note = 'Filtered to ' + S.verdict.toUpperCase() + ' verdict · ' + note;
-    setText('count', note);
     var fc = { farm: 0, thin: 0, skip: 0 };
     priced.forEach(function (x) { fc[x.v] = (fc[x.v] ? fc[x.v] : 0) + 1; });
-    var sumEl = document.getElementById('count');
-    sumEl.appendChild(document.createTextNode(' · At ' + depositLabel() + ' · ' + Math.round(S.share * 1000) / 10 + '% drop · ' + (S.horizon === 'model' ? 'model hold' : S.horizon + ' days') + ' — ' + fc.farm + ' farm, ' + fc.thin + ' thin, ' + fc.skip + ' skip at this deposit.'));
+    var note = list.length + ' rows · sorted by ' + sortLabel + ' ↓ · rank range P10–P90, 200 refits · ' + fc.farm + ' farm, ' + fc.thin + ' thin, ' + fc.skip + ' skip at ' + depositLabel() + ' · FARM: odds ≥50%, net >0, ≥$20/h · SKIP: odds <30%, slice ≤gas, 7d ≤−30% · THIN: rest (FARM→THIN at 7d ≤−15%).';
+    if (S.verdict !== 'all') note = 'Filtered to ' + S.verdict.toUpperCase() + ' verdict · ' + note;
+    setText('count', note);
     var vSel = document.getElementById('verdict');
     vSel.options[0].text = 'All (' + DATA.rows.length + ')';
     vSel.options[1].text = 'Farm (' + fc.farm + ')';
     vSel.options[2].text = 'Thin (' + fc.thin + ')';
     vSel.options[3].text = 'Skip (' + fc.skip + ')';
+    var tabPre = document.querySelector('#tab button[data-tab="pre"]');
+    var tabLive = document.querySelector('#tab button[data-tab="live"]');
+    if (tabPre) tabPre.textContent = 'Pre-token (' + DATA.rows.length + ')';
+    if (tabLive) tabLive.textContent = 'Live (' + (DATA.live ? DATA.live.length : 0) + ')';
     setText('rank-legend', 'Rank range: P10–P90, 200 bootstrap refits (bootstrapRankRanges).');
     var strip2 = document.getElementById('ministrip');
     if (isFilteredView) {
@@ -508,8 +505,7 @@
       strip2.hidden = true;
       strip2.textContent = '';
     }
-    // Filtered-set aggregates: sum of the rounded per-row nets, so the
-    // total reads exactly as the rows beside it add up.
+    // Filtered-set aggregates use rounded per-row nets.
     var st = document.getElementById('settotals');
     st.textContent = '';
     if (list.length && list.length !== DATA.rows.length) {
@@ -520,7 +516,6 @@
     }
   }
 
-  // Export shown rows.
   function download(name, text, type) {
     var blob = new Blob([text], { type: type });
     var a = document.createElement('a');
@@ -542,7 +537,6 @@
     download('token-radar.json', JSON.stringify(filtered().map(function (r) { return { rank: r.rank, slug: r.slug, name: r.name, implied_value_usd: r.implied_value_usd, token_odds: r.token_odds, net_usd: price(r).net }; }), null, 2), 'application/json');
   });
 
-  // Detail: a full page, not a modal.
   function openDetail(slug) {
     var r = null;
     DATA.rows.forEach(function (x) { if (x.slug === slug) r = x; });
@@ -560,7 +554,6 @@
     inner.appendChild(el('p', { class: 'sub', text: 'Rank ' + r.rank + ' of ' + DATA.rows.length + ' · rank range #' + r.rank_min + '–' + r.rank_max + ' (200 refits) · ' + (isWatchlist(r) ? 'Watchlist' : 'Early find') }));
     inner.appendChild(el('h2', { text: r.name }));
     inner.appendChild(el('p', { class: 'sub', text: catOf(r) + ' on ' + ((r.chains || []).join(', ') || 'an unnamed chain') + ' · TVL ' + money(r.tvl_usd) + ' · ' + ageFmt(r.age_days) }));
-    // 1. Build chain.
     inner.appendChild(el('h3', { text: 'How ' + money(r.implied_value_usd) + ' is built' }));
     var build = el('div', { class: 'equation' });
     [
@@ -573,11 +566,9 @@
     });
     if (r.family_child) build.appendChild(el('div', null, [el('span', { text: 'Family effect' }), el('b', { text: 'parent already has a token — odds down-weighted' })]));
     inner.appendChild(build);
-    // 2. Verdict line.
     inner.appendChild(el('div', null, [badge(v), r.guard_reason ? el('span', { class: 'guard', text: ' ' + r.guard_reason }) : null,
       el('span', { class: 'sub', text: ' Deposit $' + p.deposit.toLocaleString('en-US') + ' · gas ~$' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' · hold ' + p.hold + ' days' })]));
     inner.appendChild(el('div', { class: 'eqbar' }, [el('b', { text: 'Drop − fees ' + signed(p.dropFees) + ' − T-bill forgone ' + money2(p.tbill) + ' = net ' + signed(p.net) + ', ' + signed(p.nph) + ' an hour. ' }), document.createTextNode(p.beT !== null ? 'Pays from a $' + p.beT.toLocaleString('en-US') + ' ticket.' : 'No ticket size pays: the slice per dollar is below the T-bill rate.')]));
-    // Verdict by deposit.
     var savedDeposit = S.deposit;
     var depositVerdicts = [1000, 5000, 10000, 25000].map(function (d) {
       S.deposit = d;
@@ -592,15 +583,15 @@
     bench.appendChild(el('b', { text: 'Benchmarks: ' }));
     bench.appendChild(document.createTextNode('same $' + p.deposit.toLocaleString('en-US') + ' in a 4% T-bill ' + money2(p.tbill) + ' · launch drop, after fees, ' + signed(launchDrop) + ' · fees covered above ' + (p.beO !== null ? Math.round(p.beO * 100) + '%' : '—') + ' odds / ' + (shareStar * 100).toFixed(2) + '% share · exit below ' + money(r.exit_tvl_usd) + ' (' + pct(r.exit_drop_pct) + ' in 7 days).'));
     inner.appendChild(bench);
-    // 3. Farm plan steps.
     inner.appendChild(el('h3', { text: 'Farm plan' }));
     var steps = el('ol', { class: 'steps' });
     (r.farm_steps || []).forEach(function (s) {
       steps.appendChild(el('li', null, [el('b', { text: s.text }), el('span', { class: 'cost', text: 'Cost: ' + s.cost + ' · Time: ' + s.time })]));
     });
     inner.appendChild(steps);
-    // 4. Timeline.
-    inner.appendChild(el('h3', { text: 'Week 0–12 timeline' }));
+    // 4. Timeline, drawn from this row's own hold: week 0 setup to the claim day.
+    var lastWeek = Math.floor(p.hold / 7);
+    inner.appendChild(el('h3', { text: 'Week 0–' + lastWeek + ' timeline' }));
     var checkCount = Math.floor(p.hold / 7);
     var checkDays = [];
     for (var cd = 7; cd <= p.hold; cd += 7) checkDays.push(cd);
@@ -610,10 +601,8 @@
     timeline.appendChild(el('span', { class: 'hot', text: 'Day ' + p.hold + ' · claim, 10 min' }));
     inner.appendChild(timeline);
     inner.appendChild(el('p', { class: 'sub', text: 'Week 0 setup, ' + checkCount + ' checks on days ' + checkDays[0] + '–' + checkDays[checkDays.length - 1] + ', claim day ' + p.hold + '. Step times add to ' + p.hours.toFixed(2) + ' hours.' }));
-    // 5. Plan totals.
     var totalFees = (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + p.tbill;
     inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps, ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees + forgone yield · ' + p.hours.toFixed(1) + ' h hands-on · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
-    // Detail evidence.
     var t = r.odds_terms || {};
     var ageY = ((r.age_days === null || r.age_days === undefined) ? 365 : r.age_days) / 365.25;
     var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
@@ -624,7 +613,7 @@
     var peerRows = '';
     peers.forEach(function (d) { peerRows += '<tr><td>' + esc(d.name) + '</td><td class="num">' + money(d.tvl_usd) + '</td><td class="num">' + money(d.mcap_usd) + '</td><td class="num">' + (d.mcap_usd / d.tvl_usd).toFixed(2) + '×</td></tr>'; });
     var savedD = S.deposit, savedS = S.share, curD = p.deposit, curS = S.share, mx = '';
-    [1000, 5000, 10000].forEach(function (d) {
+    [1000, 5000, 10000, 25000].forEach(function (d) {
       mx += '<tr><td>$' + d.toLocaleString('en-US') + '</td>';
       [0.035, 0.07, 0.14].forEach(function (sh) {
         S.deposit = d; S.share = sh;
@@ -645,7 +634,6 @@
     window.scrollTo(0, 0);
   }
 
-  // ---- wiring ----
   function wireSeg(id, fn) {
     var n = document.getElementById(id);
     n.addEventListener('click', function (e) {
@@ -685,7 +673,6 @@
   });
 
   renderBoard();
-    // Deep link.
   (function () {
     var hash = window.location.hash || '';
     var m = /[#&]p=([^&]+)/.exec(hash);

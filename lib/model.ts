@@ -1530,7 +1530,7 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
     steps: (ctx) => {
       const borrow = Math.max(10, Math.round(ctx.capital / 3));
       return [
-        { text: `Put ${ctx.cap} of USDC into ${ctx.name} on ${ctx.chain} as collateral, keeping the loan-to-value below 50%.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+        { text: `Deposit ${ctx.cap} of USDC into ${ctx.name} on ${ctx.chain} as collateral, keeping the loan-to-value below 50%.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
         { text: `Borrow $${borrow} of the chain's stablecoin against that ${ctx.name} collateral and leave it in the same wallet, so the position counts as active borrowing.`, cost: `$${borrow} borrowed, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
         { text: `Once a week, add a little collateral or repay a small part of the borrow on ${ctx.name}, so the position shows fresh activity in every snapshot.`, cost: 'about $2 of gas a week', time: WEEKLY_CHECK },
       ];
@@ -1548,15 +1548,15 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('yield'),
     steps: (ctx) => [
-      { text: `Put ${ctx.cap} of USDC into ${ctx.name}'s longest-running strategy on ${ctx.chain} and keep the receipt token.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
-      { text: `Spend 10 minutes comparing ${ctx.name}'s strategies and pick the one with the longest public track record.`, cost: '$0 extra capital', time: SETUP_INSIDE },
+      { text: `Deposit ${ctx.cap} of USDC into ${ctx.name}'s longest-running strategy on ${ctx.chain} and keep the receipt token.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+      { text: `Take 10 minutes to compare ${ctx.name}'s strategies and pick the one with the longest public track record.`, cost: '$0 extra capital', time: SETUP_INSIDE },
       { text: `Claim ${ctx.name}'s strategy yield once a week and put it back in, so the position compounds and the wallet stays active.`, cost: 'about $2 of gas a week', time: WEEKLY_CHECK },
     ],
   },
   {
     match: (c) => c.includes('curator') || c.includes('allocator'),
     steps: (ctx) => [
-      { text: `Put ${ctx.cap} into a ${ctx.name} vault on ${ctx.chain} and keep the vault shares in the farming wallet.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+      { text: `Deposit ${ctx.cap} into a ${ctx.name} vault on ${ctx.chain} and keep the vault shares in the farming wallet.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
       { text: `Read ${ctx.name}'s vault curator page for 10 minutes and note the 3 markets it allocates to most, so you can speak for the position later.`, cost: '$0 extra capital', time: SETUP_INSIDE },
       { text: `Add a small top-up into the same ${ctx.name} vault once a week, so the deposit shows fresh activity.`, cost: 'about $2 of gas a week', time: WEEKLY_CHECK },
     ],
@@ -1609,14 +1609,14 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('payment') || c.includes('card issuer'),
     steps: (ctx) => [
-      { text: `Spend ${ctx.cap} through ${ctx.name} on ${ctx.chain} for a real purchase, and keep the receipt for 30 days.`, cost: `${ctx.cap} to spend, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+      { text: `Pay ${ctx.cap} through ${ctx.name} on ${ctx.chain} for a real purchase, and keep the receipt for 30 days.`, cost: `${ctx.cap} to spend, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
       { text: `Use the ${ctx.name} payment route once a week for a small amount, so the account shows regular use.`, cost: 'about $2 of gas a week', time: WEEKLY_CHECK },
     ],
   },
   {
     match: (c) => c.includes('privacy'),
     steps: (ctx) => [
-      { text: `Put ${ctx.cap} into ${ctx.name}'s private pool on ${ctx.chain} and keep the withdrawal note safe for the full hold.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+      { text: `Deposit ${ctx.cap} into ${ctx.name}'s private pool on ${ctx.chain} and keep the withdrawal note safe for the full hold.`, cost: `${ctx.cap} deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
       { text: `Withdraw a small amount once a week and put it back in, so the pool sees regular activity.`, cost: 'about $2 of gas a week', time: WEEKLY_CHECK },
       { text: `Never share the ${ctx.name} withdrawal note or the pool link with anyone, not even in a screenshot.`, cost: '$0 extra capital', time: NO_EXTRA },
     ],
@@ -1674,14 +1674,14 @@ const PLAN_TEMPLATES: { match: (c: string) => boolean; steps: PlanTemplate }[] =
   {
     match: (c) => c.includes('cedefi'),
     steps: (ctx) => [
-      { text: `Put ${ctx.cap} into ${ctx.name}'s managed account on ${ctx.chain} and keep the balance in the farming wallet.`, cost: `${ctx.cap} to deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
+      { text: `Deposit ${ctx.cap} into ${ctx.name}'s managed account on ${ctx.chain} and keep the balance in the farming wallet.`, cost: `${ctx.cap} to deposit, about $${gasQuarter(ctx)} of gas`, time: SETUP_INSIDE },
       { text: `Check the ${ctx.name} account once a week and note the reported yield for the last 7 days.`, cost: '$0 to check', time: WEEKLY_CHECK },
     ],
   },
   {
     match: (c) => c.includes('chain') || c.includes('ai agent') || c.includes('decentralized ai'),
     steps: (ctx) => [
-      { text: `Try ${ctx.name}'s main app once, with ${ctx.cap}, so the wallet has a real interaction on record within 7 days.`, cost: `about ${ctx.cap} for the trial`, time: SETUP_INSIDE },
+      { text: `Use ${ctx.name}'s main app once, with ${ctx.cap}, so the wallet has a real interaction on record within 7 days.`, cost: `about ${ctx.cap} for the trial`, time: SETUP_INSIDE },
       { text: `Use ${ctx.name} on ${ctx.chain} once a week: run one transaction from the farming wallet and keep it active.`, cost: `about $${gasQuarter(ctx)} of gas a week`, time: WEEKLY_CHECK },
     ],
   },
@@ -1721,7 +1721,7 @@ export function farmPlanSteps(
   };
   const test: FarmStep = {
     text: `Deposit $100 first, confirm it shows in ${p.name}, then add the rest up to ${ctx.cap}.`,
-    cost: `included in the $${gas} gas`,
+    cost: `no extra gas: within the $${gas} run total`,
     time: SETUP_INSIDE,
   };
   const exit: FarmStep = {
