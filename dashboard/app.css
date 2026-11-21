@@ -1,4 +1,4 @@
-/* Token Radar — dark theme. One accent, system fonts, no network. Compact so the cover shows the evidence and a dozen rows at 900px. */
+/* Token Radar — dark theme, system fonts, no network. */
 :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#3fb950;--amber:#d29922;--red:#f85149;--blue:#79c0ff;--radius:10px;--body:system-ui,-apple-system,"Segoe UI",sans-serif;--num:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.45}
@@ -16,7 +16,7 @@ a.skip:focus{position:static;display:block;padding:8px 16px;background:var(--acc
 .reading b{color:var(--text)}
 .kpis{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:1px 0}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0 8px 1px}
-.kpi b{display:block;font-size:13.5px;font-family:var(--num)}
+.kpi b{display:block;font-size:16px;font-family:var(--num)}
 .kpi span{color:var(--muted);font-size:10.5px;display:block;line-height:1.2}
 .farmnext{font-size:11.5px;color:var(--muted);margin:0}
 .farmnext b{color:var(--text)}
@@ -32,13 +32,12 @@ a.skip:focus{position:static;display:block;padding:8px 16px;background:var(--acc
 .ev-col .sub{margin:0 0 2px;font-size:11px}
 .toggle{background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:1px 8px;font:inherit;font-size:11px;cursor:pointer;margin-left:8px}
 .sub{color:var(--muted);font-size:12px;margin:0 0 5px}
-.evidence3 .sub{font-size:11.5px}
+.evidence3 .sub{font-size:11px;line-height:1.2;margin:0 0 1px}
 table{border-collapse:collapse;width:100%}
 th,td{padding:2px 6px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
 th{color:var(--muted);font-size:11.5px;font-weight:600;white-space:nowrap}
 td{font-size:12.5px}
 .evidence3 td{font-size:11px;padding:0 6px;line-height:1.15}
-.evidence3 .sub{font-size:11px;line-height:1.2;margin:0 0 1px}
 #scatter svg{display:block;width:100%;height:auto}
 #scatter text{font-family:var(--num);font-size:9px;fill:var(--muted)}
 .scatter-grid{stroke:var(--border);stroke-width:1}
@@ -102,22 +101,22 @@ input,select{background:var(--surface);color:var(--text);border:1px solid var(--
 .ledger-cover .ledger-bar{margin:2px 0 0;height:10px}
 .detail-evidence{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
 .odds-lines{font-size:12px;line-height:1.2}
-#detail table.evidence td{padding:0 6px}
+#detail table.evidence td{padding:0 6px;font-size:11.5px}
 .odds-lines b{font-family:var(--num)}
 td.hot{background:var(--surface2);outline:1px solid var(--accent)}
 .detail-page{position:fixed;inset:0;background:var(--bg);overflow:auto;z-index:10;padding:4px 0 48px}
 .detail-inner{max-width:1240px;margin:0 auto;padding:0 20px;font-size:12.5px}
 .detail-page h2{font-size:19px;margin:1px 0}
 .back{background:none;border:0;color:var(--accent);font:inherit;font-size:13px;cursor:pointer;padding:0}
-.eqbar{background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:6px 12px;font-size:13.5px;margin:5px 0}
+.eqbar{background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:4px 12px;font-size:13.5px;margin:5px 0}
 .eqbar b{font-family:var(--num)}
 .detail-page .equation div{display:flex;justify-content:space-between;gap:12px;padding:0;border-bottom:1px solid var(--border)}
 .detail-page .equation b{font-family:var(--num);text-align:right;white-space:nowrap}
 .steps{margin:3px 0;padding-left:22px}
-.steps li{margin-bottom:1px}
+.steps li{margin-bottom:0}
 .steps .cost{color:var(--muted);font-size:12px;display:block}
-.detail-page h3{font-size:14px;margin:4px 0 1px}
+.detail-page h3{font-size:14px;margin:2px 0 1px}
 .timeline{display:flex;gap:4px;margin:4px 0}
-.timeline span{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:11.5px;color:var(--muted);text-align:center}
+.timeline span{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:11.5px;color:var(--muted);text-align:center}
 .timeline span.hot{border-color:var(--accent);color:var(--text)}
 @media (max-width:900px){.kpis{grid-template-columns:repeat(4,1fr)}.evidence3{grid-template-columns:1fr}}

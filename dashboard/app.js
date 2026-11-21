@@ -1,5 +1,4 @@
-// Token Radar dashboard, model radar-8. Reads window.RADAR (data.js);
-// every number traces to a field of it. No network.
+// Token Radar dashboard. Reads window.RADAR (data.js); every number traces to a field of it. No network.
 (function () {
   'use strict';
   var DATA = window.RADAR;
@@ -57,7 +56,7 @@
     return '$' + S.deposit.toLocaleString('en-US');
   }
 
-  // depositFor/verdictFor arithmetic, as in lib/model.ts.
+  // Pricing, as in lib/model.ts.
   function price(r) {
     var deposit = S.deposit === 'row' ? r.deposit_usd : S.deposit;
     var hold = S.horizon === 'model' ? (typeof r.hold_days === 'number' ? r.hold_days : 30) : S.horizon;
@@ -72,8 +71,7 @@
     var beO = base > 0 ? (gas + tbill) / base : null;
     return { deposit: deposit, slice: slice, dropFees: slice - gas, tbill: tbill, net: net, nph: net / hours, beT: beT, beO: beO !== null && beO > 0 && beO <= 0.95 ? beO : null, hold: hold, hours: hours };
   }
-  // verdictFor: FARM needs odds, positive net, $20/hour; SKIP on low
-  // odds or fees over the drop; crash guard demotes/skips sharp falls.
+  // verdictFor: FARM needs odds, net, $20/h; crash guard demotes/skips falls.
   function verdict(r, p) {
     var g7 = r.change_7d;
     if (g7 !== null && g7 !== undefined && g7 <= -30) return 'skip';
@@ -100,18 +98,15 @@
   (function () {
     setText('snap-date', DATA.as_of);
     setText('model-ver', DATA.model_version ? DATA.model_version : '—');
-    setText('board-count', String(DATA.board_size ? DATA.board_size : DATA.rows.length));
-    setText('judge-checksum', DATA.checksum ? DATA.checksum : '—');
     var counts = { farm: 0, thin: 0, skip: 0 };
     DATA.rows.forEach(function (r) { counts[r.verdict] = (counts[r.verdict] ? counts[r.verdict] : 0) + 1; });
     var watchTotal = DATA.watchlist_size ? DATA.watchlist_size : 40;
-    var earlyTotal = DATA.early_size ? DATA.early_size : 0;
     var kpis = [
       ['Watchlist, ranked', watchTotal + '/' + watchTotal],
       ['Board', String(DATA.board_size ? DATA.board_size : DATA.rows.length)],
       ['Leave-one-out miss', miss(FIT.loo_miss)],
       ['Walk-forward miss', miss(FIT.wf_miss)],
-      ['Brier, walk-forward', fmtNum(FIT.odds_brier_wf, 3)],
+      ['called right · Brier ' + fmtNum(FIT.odds_brier_wf, 3) + ' · never-tokens ' + pct1(FIT.odds_acc_never) + ' · base-rate ' + pct1(FIT.odds_acc_trainbase), pct1(FIT.odds_acc_wf)],
       ['Within 3× of real cap', pct1(FIT.w3_loo) + ' · ' + pct1(FIT.w3_wf)],
       ['P25–P75 hit, printed band', pct1(FIT.mid_loo) + ' · ' + pct1(FIT.mid_wf)],
       ['Worth farming', (counts.farm ? counts.farm : 0) + ' of ' + DATA.rows.length],
@@ -121,24 +116,15 @@
     var next = DATA.rows.filter(function (r) { return r.verdict === 'farm'; })
       .slice().sort(function (a, b) { return b.net_per_hour_usd - a.net_per_hour_usd; }).slice(0, 3);
     var fn = document.getElementById('farmnext');
-    fn.appendChild(el('b', { text: 'Farm next by net/hour, per-row deposit: ' }));
+    fn.appendChild(el('b', { text: 'Farm next by $/h (per-row deposit): ' }));
     next.forEach(function (r, i) {
       if (i) fn.appendChild(document.createTextNode(' · '));
       var s = el('span', null, [document.createTextNode('#' + r.rank + ' ' + r.name + ' '), el('span', { class: 'pos', text: signed(r.net_per_hour_usd) + '/h' })]);
       fn.appendChild(s);
     });
-    setText('jn-watch', String(watchTotal));
-    setText('jn-watch-total', String(watchTotal));
-    setText('jn-early', String(earlyTotal));
-    setText('jn-loo', fmtNum(FIT.loo_miss, 2));
-    setText('jn-loo2', fmtNum(FIT.loo_miss, 2));
-    setText('jn-wf', fmtNum(FIT.wf_miss, 2));
-    setText('jn-brier', fmtNum(FIT.odds_brier_wf, 3));
-    setText('jn-base', fmtNum(FIT.odds_brier_base, 3));
-    setText('jn-ceiling', hasNum(OF.ceiling_years) ? OF.ceiling_years.toFixed(2) : '—');
   })();
 
-  // Integrity: recompute the board from data.js.
+  // Integrity check.
   (function () {
     var total = 0, ok = 0, prev = Infinity, ordered = true;
     DATA.rows.forEach(function (r) {
@@ -151,7 +137,7 @@
     var p = document.getElementById('integrity');
     p.textContent = '';
     p.appendChild(el('b', { text: 'Integrity: ' }));
-    p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total ' + money(total) + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' (FNV-1a of rank:slug:implied)'));
+    p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total $' + total.toLocaleString('en-US') + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' (FNV-1a of rank:slug:implied)'));
   })();
 
   (function () {
@@ -167,10 +153,10 @@
     var traded = (DATA.ledger || []).filter(function (g) { return g.key === 'token-trades' || g.key === 'token-no-cap'; });
     var aside = (DATA.ledger || []).filter(function (g) { return g.key.indexOf('out-') === 0; });
     var sum = function (list) { return list.reduce(function (a, g) { return a + g.count; }, 0); };
-    setText('ledger-line', sum(ranked) + ' ranked (' + (ranked[0] ? ranked[0].count : 40) + ' watchlist · ' + (ranked[1] ? ranked[1].count : 158) + ' early) · ' + sum(traded) + ' token on record · ' + sum(aside) + ' set aside by the house rules — every snapshot protocol in exactly one group.');
+    setText('ledger-line', sum(ranked) + ' ranked (' + (ranked[0] ? ranked[0].count : 40) + ' watchlist · ' + (ranked[1] ? ranked[1].count : 158) + ' early) · ' + sum(traded) + ' token on record · ' + sum(aside) + ' set aside — every protocol in exactly one group.');
   })();
 
-  // Cover evidence: value/odds tables, coefficients, peers.
+  // Cover evidence.
   (function () {
     function termByName(part) {
       var found = null;
@@ -184,14 +170,14 @@
     var ageTerm = termByName('+ age');
     var curve = termByName('+ curvature');
     var valueRows = [
-      ['flat', flat],
-      ['size only', sizeOnly],
+      ['flat (base)', flat],
+      ['size only (tested)', sizeOnly],
       ['size + category (kept)', kept],
-      ['+ growth', growth],
-      ['+ age, in the value model', ageTerm],
-      ['+ curvature', curve],
-      ['control: hash of the name', null],
-      ["control: another row's growth", null],
+      ['+ growth (tested)', growth],
+      ['+ age (tested)', ageTerm],
+      ['+ curvature (tested)', curve],
+      ['control: name hash', null],
+      ['control: other-row growth', null],
     ];
     var body = document.getElementById('value-evidence-body');
     valueRows.forEach(function (row, k) {
@@ -203,9 +189,10 @@
         el('td', { text: miss(wf) }),
       ]));
     });
-    setText('value-reasons', '+ growth loses both; + age/+ curvature win WF, lose LOO: fail the both-tests rule; age stays in odds. Controls must not help.');
+    setText('value-reasons', '+ growth loses both · + age/+ curvature win WF, lose LOO: fail the both-tests rule · age stays in odds · controls must not help.');
     setText('value-cut', 'cut from flat: ' + pct1(FIT.cut_loo) + ' · ' + pct1(FIT.cut_wf) + ' · within ×3: ' + pct1(FIT.w3_loo) + ' · ' + pct1(FIT.w3_wf) + ' (flat ' + pct1(FIT.w3_flat_loo) + ' · ' + pct1(FIT.w3_flat_wf) + ')');
-    setText('value-band', 'printed band hits P25–P75 ' + pct1(FIT.mid_loo) + ' · ' + pct1(FIT.mid_wf) + ', P10–P90 ' + pct1(FIT.wide_loo) + ' · ' + pct1(FIT.wide_wf) + ' (strict refit: ' + pct1(FIT.mid_strict_loo) + ' · ' + pct1(FIT.mid_strict_wf) + ', ' + pct1(FIT.wide_strict_loo) + ' · ' + pct1(FIT.wide_strict_wf) + ') · slope ' + fmtNum(FIT.value_log_tvl, 3) + ' ± ' + fmtNum(FIT.value_log_tvl_se, 3) + ' (200 bootstrap refits)');
+    setText('value-band', 'printed band hits P25–P75 ' + pct1(FIT.mid_loo) + ' · ' + pct1(FIT.mid_wf) + ', P10–P90 ' + pct1(FIT.wide_loo) + ' · ' + pct1(FIT.wide_wf) + ' · slope ' + fmtNum(FIT.value_log_tvl, 3) + ' ± ' + fmtNum(FIT.value_log_tvl_se, 3) + ' (200 bootstrap refits)');
+    setText('value-strict', 'Strict refit, train-side bands only: P25–P75 ' + pct1(FIT.mid_strict_loo) + ' · ' + pct1(FIT.mid_strict_wf) + ', P10–P90 ' + pct1(FIT.wide_strict_loo) + ' · ' + pct1(FIT.wide_strict_wf) + '.');
     var oddsBody = document.getElementById('odds-evidence-body');
     var brierRow = function (label, a, baseA, b, baseB) {
       return el('tr', null, [
@@ -216,15 +203,15 @@
     };
     oddsBody.appendChild(brierRow('Brier, model vs base', OF.brier_10fold, OF.brier_10fold_base, OF.brier_wf_median, OF.brier_wf_median_base));
     oddsBody.appendChild(el('tr', null, [el('td', { text: 'AUC' }), el('td', { text: fmtNum(OF.auc_10fold, 3) }), el('td', { text: fmtNum(OF.auc_wf, 3) })]));
-    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: hash of the name (must not help), Brier' }), el('td', { text: fmtNum(OF.placebo_hash_brier_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_hash_brier_wf, 3) })]));
-    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: hash, AUC' }), el('td', { text: fmtNum(OF.placebo_hash_auc_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_hash_auc_wf, 3) })]));
-    oddsBody.appendChild(el('tr', null, [el('td', { text: "control: another row's growth (must not help), Brier" }), el('td', { text: fmtNum(OF.placebo_growth_brier_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_growth_brier_wf, 3) })]));
-    oddsBody.appendChild(el('tr', null, [el('td', { text: "control: another row's growth, AUC" }), el('td', { text: fmtNum(OF.placebo_growth_auc_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_growth_auc_wf, 3) })]));
+    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: name hash · Brier' }), el('td', { text: fmtNum(OF.placebo_hash_brier_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_hash_brier_wf, 3) })]));
+    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: name hash · AUC' }), el('td', { text: fmtNum(OF.placebo_hash_auc_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_hash_auc_wf, 3) })]));
+    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: other-row growth · Brier' }), el('td', { text: fmtNum(OF.placebo_growth_brier_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_growth_brier_wf, 3) })]));
+    oddsBody.appendChild(el('tr', null, [el('td', { text: 'control: other-row growth · AUC' }), el('td', { text: fmtNum(OF.placebo_growth_auc_10fold, 3) }), el('td', { text: fmtNum(OF.placebo_growth_auc_wf, 3) })]));
     var coef = function (v, se) {
       var sign = v >= 0 ? '+' : '−';
       return sign + Math.abs(v).toFixed(3) + ' ± ' + fmtNum(se, 3);
     };
-    setText('odds-coefs', 'Fitted, ± bootstrap s.e.: const ' + coef(OF.const, OF.const_se) + ' · years ' + coef(OF.years, OF.years_se) + ' · ln(TVL/$100M) ' + coef(OF.ln_tvl, OF.ln_tvl_se) + ' · 7d growth ' + coef(OF.growth, OF.growth_se) + ' · family ' + coef(OF.family, OF.family_se) + ' (ridge-shrunk).');
+    setText('odds-coefs', 'Fit ± bootstrap s.e.: const ' + coef(OF.const, OF.const_se) + ' · years ' + coef(OF.years, OF.years_se) + ' · ln(TVL/$100M) ' + coef(OF.ln_tvl, OF.ln_tvl_se) + ' · 7d growth ' + coef(OF.growth, OF.growth_se) + ' · family ' + coef(OF.family, OF.family_se) + ' (ridge-shrunk).');
     var diff = (hasNum(OF.peers_symbol) && hasNum(OF.peers_owned)) ? OF.peers_symbol - OF.peers_owned : 0;
     setText('odds-peers', (OF.peers ? OF.peers : 0) + ' shape-passing peers: ' + (OF.peers_symbol ? OF.peers_symbol : 0) + ' record a symbol; ' + (OF.peers_owned ? OF.peers_owned : 0) + ' own it (' + diff + " inherit a sibling's).");
     setText('odds-accuracy', pct1(FIT.odds_acc_wf) + ' called right at p ≥ 0.5; ‘never tokens’ guess ' + pct1(FIT.odds_acc_never) + '; base-rate guess ' + pct1(FIT.odds_acc_trainbase) + '. Brier and AUC are the headline.');
@@ -241,7 +228,7 @@
     });
   })();
 
-  // Cover scatter, drawn live from DATA.live/DATA.rows (log scales).
+  // Cover scatter (log scales).
   (function () {
     var box = document.getElementById('scatter');
     if (!box) return;
@@ -277,10 +264,10 @@
     rows.forEach(function (d) { dots += '<circle class="scatter-board" cx="' + X(d.tvl_usd) + '" cy="' + Y(d.implied_value_usd) + '" r="1.8"/>'; });
     live.forEach(function (d) { dots += '<circle class="scatter-live" cx="' + X(d.tvl_usd) + '" cy="' + Y(d.mcap_usd) + '" r="2.6"/>'; });
     box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img">' + s + '<polygon class="scatter-band" points="' + hi + lo + '"/><polyline class="scatter-curve" points="' + line + '"/>' + dots + '</svg>';
-    setText('scatter-note', live.length + ' live comps (blue), ' + rows.length + ' board rows (green). Curve exp(' + M.value_const.toFixed(4) + ' + ' + M.value_log_tvl.toFixed(4) + ' × ln TVL); band ×' + FIT.resid_p25_mult.toFixed(2) + '–×' + FIT.resid_p75_mult.toFixed(2) + '. Board points sit below the curve: implied values after ever-odds.');
+    setText('scatter-note', live.length + ' live comps (blue), ' + rows.length + ' board rows (green). Curve exp(' + M.value_const.toFixed(4) + ' + ' + M.value_log_tvl.toFixed(4) + ' × ln TVL); band ×' + FIT.resid_p25_mult.toFixed(2) + '–×' + FIT.resid_p75_mult.toFixed(2) + '. Board points are after ever-odds.');
   })();
 
-  // Category effects, ledger, live comparables.
+  // Categories, ledger, live.
   (function () {
     var body = document.getElementById('cats-body');
     var counts = {};
@@ -323,7 +310,7 @@
     liveTable.appendChild(tb);
   })();
 
-  // Filters, what-if, board.
+  // Filters and board.
   (function () {
     var catCounts = {};
     DATA.rows.forEach(function (r) { var c = catOf(r); catCounts[c] = (catCounts[c] ? catCounts[c] : 0) + 1; });
@@ -479,7 +466,7 @@
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.slug); } },
         tabindex: '0',
       }, [
-        el('td', { class: 'num', title: 'rank range, 200 refits' }, [el('b', { text: '#' + r.rank }), el('div', { class: 'sub', text: r.rank_min + '–' + r.rank_max })]),
+        el('td', { class: 'num' }, [el('b', { text: '#' + r.rank }), el('div', { class: 'sub', text: r.rank_min + '–' + r.rank_max })]),
         el('td', null, nameBox),
         el('td', { class: 'num', text: money(r.tvl_usd) }),
         el('td', { class: 'num' }, [
@@ -512,7 +499,15 @@
     vSel.options[1].text = 'Farm (' + fc.farm + ')';
     vSel.options[2].text = 'Thin (' + fc.thin + ')';
     vSel.options[3].text = 'Skip (' + fc.skip + ')';
-    setText('rank-legend', 'Rank range: P10–P90 from 200 bootstrap refits (bootstrapRankRanges), widened to include the row’s own rank.');
+    setText('rank-legend', 'Rank range: P10–P90, 200 bootstrap refits (bootstrapRankRanges).');
+    var strip2 = document.getElementById('ministrip');
+    if (isFilteredView) {
+      strip2.hidden = false;
+      strip2.textContent = 'Held-out: LOO ' + miss(FIT.loo_miss) + ' · WF ' + miss(FIT.wf_miss) + ' · Brier ' + fmtNum(FIT.odds_brier_wf, 3) + ' (base ' + fmtNum(FIT.odds_brier_base, 3) + ') · within ×3 ' + pct1(FIT.w3_loo) + ' · ' + pct1(FIT.w3_wf) + ' · ' + pct1(FIT.odds_acc_wf) + ' called right · ' + fc.farm + ' farm of ' + DATA.rows.length + ' at ' + depositLabel() + '.';
+    } else {
+      strip2.hidden = true;
+      strip2.textContent = '';
+    }
     // Filtered-set aggregates: sum of the rounded per-row nets, so the
     // total reads exactly as the rows beside it add up.
     var st = document.getElementById('settotals');
@@ -520,12 +515,12 @@
     if (list.length && list.length !== DATA.rows.length) {
       var tvlSum = 0, impSum = 0, netCents = 0, hourSum = 0;
       list.forEach(function (x) { tvlSum += x.r.tvl_usd; impSum += x.r.implied_value_usd; netCents += Math.round(x.p.net * 100); hourSum += x.p.hours; });
-      st.appendChild(el('b', { text: 'Farming all ' + list.length + ' shown at ' + depositLabel() + ' each nets ' }));
-      st.appendChild(document.createTextNode(signed(netCents / 100) + ' for ' + hourSum.toFixed(1) + ' h of work · ' + money(tvlSum) + ' TVL · ' + money(impSum) + ' implied in view'));
+      st.appendChild(el('b', { text: 'Farming all ' + list.length + ' shown at ' + depositLabel() + ' nets ' }));
+      st.appendChild(document.createTextNode(signed(netCents / 100) + ' for ' + hourSum.toFixed(1) + ' h · ' + money(tvlSum) + ' TVL · ' + money(impSum) + ' implied in view'));
     }
   }
 
-  // Export: shown rows as CSV/JSON, built in the browser.
+  // Export shown rows.
   function download(name, text, type) {
     var blob = new Blob([text], { type: type });
     var a = document.createElement('a');
@@ -564,7 +559,7 @@
     inner.appendChild(el('button', { class: 'back', text: '← Board', onclick: function () { page.hidden = true; history.replaceState(null, '', window.location.pathname + window.location.search); } }));
     inner.appendChild(el('p', { class: 'sub', text: 'Rank ' + r.rank + ' of ' + DATA.rows.length + ' · rank range #' + r.rank_min + '–' + r.rank_max + ' (200 refits) · ' + (isWatchlist(r) ? 'Watchlist' : 'Early find') }));
     inner.appendChild(el('h2', { text: r.name }));
-    inner.appendChild(el('p', { class: 'sub', text: catOf(r) + ' on ' + ((r.chains || []).join(', ') || 'an unnamed chain') + ' · TVL ' + money(r.tvl_usd) + ' · ' + ageFmt(r.age_days) + ' on record' }));
+    inner.appendChild(el('p', { class: 'sub', text: catOf(r) + ' on ' + ((r.chains || []).join(', ') || 'an unnamed chain') + ' · TVL ' + money(r.tvl_usd) + ' · ' + ageFmt(r.age_days) }));
     // 1. Build chain.
     inner.appendChild(el('h3', { text: 'How ' + money(r.implied_value_usd) + ' is built' }));
     var build = el('div', { class: 'equation' });
@@ -582,21 +577,29 @@
     inner.appendChild(el('div', null, [badge(v), r.guard_reason ? el('span', { class: 'guard', text: ' ' + r.guard_reason }) : null,
       el('span', { class: 'sub', text: ' Deposit $' + p.deposit.toLocaleString('en-US') + ' · gas ~$' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' · hold ' + p.hold + ' days' })]));
     inner.appendChild(el('div', { class: 'eqbar' }, [el('b', { text: 'Drop − fees ' + signed(p.dropFees) + ' − T-bill forgone ' + money2(p.tbill) + ' = net ' + signed(p.net) + ', ' + signed(p.nph) + ' an hour. ' }), document.createTextNode(p.beT !== null ? 'Pays from a $' + p.beT.toLocaleString('en-US') + ' ticket.' : 'No ticket size pays: the slice per dollar is below the T-bill rate.')]));
-    // Verdict by deposit, priced live by price()/verdict().
+    // Verdict by deposit.
     var savedDeposit = S.deposit;
     var depositVerdicts = [1000, 5000, 10000, 25000].map(function (d) {
       S.deposit = d;
       return '$' + d.toLocaleString('en-US') + ' ' + verdict(r, price(r)).toUpperCase();
     });
     S.deposit = savedDeposit;
-    inner.appendChild(el('p', { class: 'sub', text: 'Verdict by deposit: ' + depositVerdicts.join(' · ') + '.' }));    // 3. Farm plan steps, with cost and time on every step.
+    inner.appendChild(el('p', { class: 'sub', text: 'Verdict by deposit: ' + depositVerdicts.join(' · ') + '.' }));
+    var gas = hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0;
+    var launchDrop = r.if_launches_usd * S.share * (p.deposit / r.tvl_usd) - gas;
+    var shareStar = (gas + p.tbill) / (r.implied_value_usd * (p.deposit / r.tvl_usd));
+    var bench = el('div', { class: 'eqbar' });
+    bench.appendChild(el('b', { text: 'Benchmarks: ' }));
+    bench.appendChild(document.createTextNode('same $' + p.deposit.toLocaleString('en-US') + ' in a 4% T-bill ' + money2(p.tbill) + ' · launch drop, after fees, ' + signed(launchDrop) + ' · fees covered above ' + (p.beO !== null ? Math.round(p.beO * 100) + '%' : '—') + ' odds / ' + (shareStar * 100).toFixed(2) + '% share · exit below ' + money(r.exit_tvl_usd) + ' (' + pct(r.exit_drop_pct) + ' in 7 days).'));
+    inner.appendChild(bench);
+    // 3. Farm plan steps.
     inner.appendChild(el('h3', { text: 'Farm plan' }));
     var steps = el('ol', { class: 'steps' });
     (r.farm_steps || []).forEach(function (s) {
       steps.appendChild(el('li', null, [el('b', { text: s.text }), el('span', { class: 'cost', text: 'Cost: ' + s.cost + ' · Time: ' + s.time })]));
     });
     inner.appendChild(steps);
-    // 4. Week 0–12 timeline, drawn from the step times.
+    // 4. Timeline.
     inner.appendChild(el('h3', { text: 'Week 0–12 timeline' }));
     var checkCount = Math.floor(p.hold / 7);
     var checkDays = [];
@@ -606,18 +609,18 @@
     timeline.appendChild(el('span', { text: 'Days ' + checkDays.join(', ') + ' · ' + checkCount + ' weekly checks, 10 min each, exit rule watched' }));
     timeline.appendChild(el('span', { class: 'hot', text: 'Day ' + p.hold + ' · claim, 10 min' }));
     inner.appendChild(timeline);
-    inner.appendChild(el('p', { class: 'sub', text: 'Setup at week 0, ' + checkCount + ' weekly checks on days ' + checkDays[0] + '–' + checkDays[checkDays.length - 1] + ', claim at the hold end (day ' + p.hold + '). Step times add up to ' + p.hours.toFixed(2) + ' hours.' }));
+    inner.appendChild(el('p', { class: 'sub', text: 'Week 0 setup, ' + checkCount + ' checks on days ' + checkDays[0] + '–' + checkDays[checkDays.length - 1] + ', claim day ' + p.hold + '. Step times add to ' + p.hours.toFixed(2) + ' hours.' }));
     // 5. Plan totals.
     var totalFees = (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + p.tbill;
-    inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps over ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees and forgone yield · ' + p.hours.toFixed(1) + ' h of hands-on work · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
-    // Detail evidence, priced live (record table cut).
+    inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps, ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees + forgone yield · ' + p.hours.toFixed(1) + ' h hands-on · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
+    // Detail evidence.
     var t = r.odds_terms || {};
     var ageY = ((r.age_days === null || r.age_days === undefined) ? 365 : r.age_days) / 365.25;
     var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
     var sgn = function (v, d) { return (v >= 0 ? '+' : '') + v.toFixed(d); };
     var oddLine = function (label, coef, feat, contrib) { return '<div>' + label + ' <b>' + sgn(coef, 3) + ' × ' + feat + ' = ' + sgn(contrib, 3) + '</b></div>'; };
     var oddsHtml = oddLine('const', OF.const, '1', t.intercept) + oddLine('years', OF.years, ageY.toFixed(2) + 'y', t.years) + oddLine('ln(TVL/$100M)', OF.ln_tvl, Math.log(Math.max(1, r.tvl_usd) / 100000000).toFixed(2), t.ln_tvl) + oddLine('7d growth', OF.growth, ((r.change_7d === null || r.change_7d === undefined ? 0 : r.change_7d)).toFixed(2) + '%', t.growth) + oddLine('family', OF.family, r.family_child ? '1' : '0', t.family);
-    var peers = (DATA.live || []).filter(function (d) { return d.mcap_usd > 0 && d.tvl_usd > 0; }).slice().sort(function (a, b) { return Math.abs(Math.log(a.tvl_usd) - Math.log(r.tvl_usd)) - Math.abs(Math.log(b.tvl_usd) - Math.log(r.tvl_usd)); }).slice(0, 3);
+    var peers = (DATA.live || []).filter(function (d) { return d.mcap_usd > 0 && d.tvl_usd > 0; }).slice().sort(function (a, b) { return Math.abs(Math.log(a.tvl_usd) - Math.log(r.tvl_usd)) - Math.abs(Math.log(b.tvl_usd) - Math.log(r.tvl_usd)); }).slice(0, 8);
     var peerRows = '';
     peers.forEach(function (d) { peerRows += '<tr><td>' + esc(d.name) + '</td><td class="num">' + money(d.tvl_usd) + '</td><td class="num">' + money(d.mcap_usd) + '</td><td class="num">' + (d.mcap_usd / d.tvl_usd).toFixed(2) + '×</td></tr>'; });
     var savedD = S.deposit, savedS = S.share, curD = p.deposit, curS = S.share, mx = '';
@@ -632,10 +635,10 @@
     });
     S.deposit = savedD; S.share = savedS;
     var ev = el('div', { class: 'detail-evidence' });
-    ev.innerHTML = '<div><h3>How the ever-odds are built</h3><div class="odds-lines">' + oddsHtml + '</div><p class="sub">logit <b>' + sgn(t.logit, 3) + '</b> → p(age) ' + Math.round(t.p_age * 100) + '% → p(' + OF.ceiling_years.toFixed(2) + 'y) ' + Math.round(t.p_max * 100) + '% → ever-odds ' + Math.round(t.ever * 100) + '%.</p></div><div><h3>Nearest priced peers</h3><table class="evidence"><tbody>' + peerRows + '</tbody></table></div>';
+    ev.innerHTML = '<div><h3>How the ever-odds are built</h3><div class="odds-lines">' + oddsHtml + '</div><p class="sub">logit <b>' + sgn(t.logit, 3) + '</b> → p(age) ' + Math.round(t.p_age * 100) + '% → p(' + OF.ceiling_years.toFixed(2) + 'y) ' + Math.round(t.p_max * 100) + '% → ever-odds ' + Math.round(t.ever * 100) + '%.</p></div><div><h3>Nearest priced peers</h3><table class="evidence"><thead><tr><th scope="col">Token</th><th scope="col" class="num">TVL</th><th scope="col" class="num">Market cap</th><th scope="col" class="num">Cap ÷ TVL</th></tr></thead><tbody>' + peerRows + '</tbody></table><p class="sub">8 nearest by TVL. No cap ÷ held-out model: live peers carry no category effect, and none is guessed.</p></div>';
     inner.appendChild(ev);
     var mxEl = el('div');
-    mxEl.innerHTML = '<h3>Drop × deposit — highlighted is the current setting</h3><table class="evidence"><tbody>' + mx + '</tbody></table>';
+    mxEl.innerHTML = '<h3>Drop × deposit (highlight = current)</h3><table class="evidence"><tbody>' + mx + '</tbody></table>';
     inner.appendChild(mxEl);
     page.appendChild(inner);
     page.hidden = false;
@@ -682,7 +685,7 @@
   });
 
   renderBoard();
-  // Deep link: #p=<slug>, #d=<deposit>, #verdict=, #category=, #q=.
+    // Deep link.
   (function () {
     var hash = window.location.hash || '';
     var m = /[#&]p=([^&]+)/.exec(hash);
