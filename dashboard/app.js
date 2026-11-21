@@ -1,6 +1,5 @@
-// Token Radar dashboard, model radar-8. Reads window.RADAR (data.js) and
-// renders the board, detail view, filters and evidence. No network: every
-// number on the page traces to a field of data.js.
+// Token Radar dashboard, model radar-8. Reads window.RADAR (data.js);
+// every number traces to a field of it. No network.
 (function () {
   'use strict';
   var DATA = window.RADAR;
@@ -39,8 +38,7 @@
   }
   function pct1(n) {
     if (!hasNum(n)) return '—';
-    // Round half to even at one decimal, matching the spec's printed
-    // table (56.25% prints 56.2%, not 56.3%).
+    // Round half to even at one decimal (56.25% prints 56.2%).
     var scaled = n * 1000;
     var fl = Math.floor(scaled);
     var frac = scaled - fl;
@@ -59,8 +57,7 @@
     return '$' + S.deposit.toLocaleString('en-US');
   }
 
-  // depositFor/verdictFor arithmetic, as in lib/model.ts. At the defaults
-  // it reproduces the row's stored verdict and net.
+  // depositFor/verdictFor arithmetic, as in lib/model.ts.
   function price(r) {
     var deposit = S.deposit === 'row' ? r.deposit_usd : S.deposit;
     var hold = S.horizon === 'model' ? (typeof r.hold_days === 'number' ? r.hold_days : 30) : S.horizon;
@@ -75,9 +72,8 @@
     var beO = base > 0 ? (gas + tbill) / base : null;
     return { deposit: deposit, slice: slice, dropFees: slice - gas, tbill: tbill, net: net, nph: net / hours, beT: beT, beO: beO !== null && beO > 0 && beO <= 0.95 ? beO : null, hold: hold, hours: hours };
   }
-  // verdictFor, as in lib/model.ts: FARM needs the odds, a positive net
-  // and $20/hour; SKIP when the odds are low or the fees exceed the
-  // drop; the crash guard demotes or skips on a sharp TVL fall.
+  // verdictFor: FARM needs odds, positive net, $20/hour; SKIP on low
+  // odds or fees over the drop; crash guard demotes/skips sharp falls.
   function verdict(r, p) {
     var g7 = r.change_7d;
     if (g7 !== null && g7 !== undefined && g7 <= -30) return 'skip';
@@ -101,7 +97,6 @@
   function setText(id, t) { var n = document.getElementById(id); if (n) n.textContent = t; }
   function miss(x) { return hasNum(x) ? '×' + x.toFixed(2) : '—'; }
 
-  // Header, KPIs, farm-next, judge note.
   (function () {
     setText('snap-date', DATA.as_of);
     setText('model-ver', DATA.model_version ? DATA.model_version : '—');
@@ -143,7 +138,7 @@
     setText('jn-ceiling', hasNum(OF.ceiling_years) ? OF.ceiling_years.toFixed(2) : '—');
   })();
 
-  // Integrity strip: recompute the board from data.js.
+  // Integrity: recompute the board from data.js.
   (function () {
     var total = 0, ok = 0, prev = Infinity, ordered = true;
     DATA.rows.forEach(function (r) {
@@ -159,7 +154,6 @@
     p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total ' + money(total) + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' (FNV-1a of rank:slug:implied)'));
   })();
 
-  // Ledger bar on the cover.
   (function () {
     var colors = ['#3fb950', '#79c0ff', '#d29922', '#8b949e', '#f85149', '#a371f7', '#ff7b72', '#e3b341', '#8b949e'];
     var bar = document.getElementById('ledger-bar-cover');
@@ -234,7 +228,6 @@
     var diff = (hasNum(OF.peers_symbol) && hasNum(OF.peers_owned)) ? OF.peers_symbol - OF.peers_owned : 0;
     setText('odds-peers', (OF.peers ? OF.peers : 0) + ' shape-passing peers: ' + (OF.peers_symbol ? OF.peers_symbol : 0) + ' record a symbol; ' + (OF.peers_owned ? OF.peers_owned : 0) + ' own it (' + diff + " inherit a sibling's).");
     setText('odds-accuracy', pct1(FIT.odds_acc_wf) + ' called right at p ≥ 0.5; ‘never tokens’ guess ' + pct1(FIT.odds_acc_never) + '; base-rate guess ' + pct1(FIT.odds_acc_trainbase) + '. Brier and AUC are the headline.');
-    // Full term table in the model panel.
     var full = document.getElementById('evidence-body');
     DATA.fit_terms.forEach(function (t) {
       full.appendChild(el('tr', null, [
@@ -287,7 +280,7 @@
     setText('scatter-note', live.length + ' live comps (blue), ' + rows.length + ' board rows (green). Curve exp(' + M.value_const.toFixed(4) + ' + ' + M.value_log_tvl.toFixed(4) + ' × ln TVL); band ×' + FIT.resid_p25_mult.toFixed(2) + '–×' + FIT.resid_p75_mult.toFixed(2) + '. Board points sit below the curve: implied values after ever-odds.');
   })();
 
-  // ---- category effects, ledger, live comparables ----
+  // Category effects, ledger, live comparables.
   (function () {
     var body = document.getElementById('cats-body');
     var counts = {};
@@ -330,7 +323,7 @@
     liveTable.appendChild(tb);
   })();
 
-  // ---- filters, what-if, board ----
+  // Filters, what-if, board.
   (function () {
     var catCounts = {};
     DATA.rows.forEach(function (r) { var c = catOf(r); catCounts[c] = (catCounts[c] ? catCounts[c] : 0) + 1; });
@@ -520,9 +513,8 @@
     vSel.options[2].text = 'Thin (' + fc.thin + ')';
     vSel.options[3].text = 'Skip (' + fc.skip + ')';
     setText('rank-legend', 'Rank range: P10–P90 from 200 bootstrap refits (bootstrapRankRanges), widened to include the row’s own rank.');
-    // Filtered-set aggregates: what farming the whole shown set would do.
-    // The net is the sum of the rounded per-row nets, so the total reads
-    // exactly as the rows beside it add up.
+    // Filtered-set aggregates: sum of the rounded per-row nets, so the
+    // total reads exactly as the rows beside it add up.
     var st = document.getElementById('settotals');
     st.textContent = '';
     if (list.length && list.length !== DATA.rows.length) {
@@ -533,7 +525,7 @@
     }
   }
 
-  // ---- export: the shown rows as CSV / JSON, built in the browser ----
+  // Export: shown rows as CSV/JSON, built in the browser.
   function download(name, text, type) {
     var blob = new Blob([text], { type: type });
     var a = document.createElement('a');
@@ -555,7 +547,7 @@
     download('token-radar.json', JSON.stringify(filtered().map(function (r) { return { rank: r.rank, slug: r.slug, name: r.name, implied_value_usd: r.implied_value_usd, token_odds: r.token_odds, net_usd: price(r).net }; }), null, 2), 'application/json');
   });
 
-  // ---- detail: a full page, not a modal ----
+  // Detail: a full page, not a modal.
   function openDetail(slug) {
     var r = null;
     DATA.rows.forEach(function (x) { if (x.slug === slug) r = x; });
@@ -618,8 +610,7 @@
     // 5. Plan totals.
     var totalFees = (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + p.tbill;
     inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps over ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees and forgone yield · ' + p.hours.toFixed(1) + ' h of hands-on work · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
-    // Detail evidence, priced live: ever-odds build, nearest
-    // priced peers, drop x deposit matrix (record table cut).
+    // Detail evidence, priced live (record table cut).
     var t = r.odds_terms || {};
     var ageY = ((r.age_days === null || r.age_days === undefined) ? 365 : r.age_days) / 365.25;
     var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
