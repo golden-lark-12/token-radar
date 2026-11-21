@@ -1,8 +1,6 @@
-// Token Radar dashboard, model radar-8. Reads window.RADAR (data.js, written beside dashboard/)
-// and renders the ranked pre-token board, the live-token comparison set, the protocol ledger,
-// the out-of-sample evidence and the fitted model. What-if controls above the board re-price
-// every row live; filtering to a verdict re-sorts by net/hour. No network: every byte shown
-// comes from data.js, and every number on the page traces to a field of it.
+// Token Radar dashboard, model radar-8. Reads window.RADAR (data.js) and
+// renders the board, detail view, filters and evidence. No network: every
+// number on the page traces to a field of data.js.
 (function () {
   'use strict';
   var DATA = window.RADAR;
@@ -61,10 +59,8 @@
     return '$' + S.deposit.toLocaleString('en-US');
   }
 
-  // Same arithmetic as the model: depositFor sizes the deposit, slice =
-  // implied x share x deposit/TVL, forgone yield = deposit x 4% x
-  // hold/365, drop minus fees = slice - gas, net = slice - gas - yield.
-  // At the defaults this reproduces the row's own verdict and net.
+  // depositFor/verdictFor arithmetic, as in lib/model.ts. At the defaults
+  // it reproduces the row's stored verdict and net.
   function price(r) {
     var deposit = S.deposit === 'row' ? r.deposit_usd : S.deposit;
     var hold = S.horizon === 'model' ? (typeof r.hold_days === 'number' ? r.hold_days : 30) : S.horizon;
@@ -105,7 +101,7 @@
   function setText(id, t) { var n = document.getElementById(id); if (n) n.textContent = t; }
   function miss(x) { return hasNum(x) ? '×' + x.toFixed(2) : '—'; }
 
-  // ---- header, KPIs, farm-next shortlist, judge note ----
+  // Header, KPIs, farm-next, judge note.
   (function () {
     setText('snap-date', DATA.as_of);
     setText('model-ver', DATA.model_version ? DATA.model_version : '—');
@@ -115,7 +111,6 @@
     DATA.rows.forEach(function (r) { counts[r.verdict] = (counts[r.verdict] ? counts[r.verdict] : 0) + 1; });
     var watchTotal = DATA.watchlist_size ? DATA.watchlist_size : 40;
     var earlyTotal = DATA.early_size ? DATA.early_size : 0;
-    var edge = hasNum(FIT.odds_brier_base) && hasNum(FIT.odds_brier_wf) ? (FIT.odds_brier_base - FIT.odds_brier_wf).toFixed(3) : '—';
     var kpis = [
       ['Watchlist, ranked', watchTotal + '/' + watchTotal],
       ['Board', String(DATA.board_size ? DATA.board_size : DATA.rows.length)],
@@ -148,7 +143,7 @@
     setText('jn-ceiling', hasNum(OF.ceiling_years) ? OF.ceiling_years.toFixed(2) : '—');
   })();
 
-  // ---- integrity strip: the page recomputes the board from data.js ----
+  // Integrity strip: recompute the board from data.js.
   (function () {
     var total = 0, ok = 0, prev = Infinity, ordered = true;
     DATA.rows.forEach(function (r) {
@@ -164,7 +159,7 @@
     p.appendChild(document.createTextNode('ranks 1–' + DATA.rows.length + (ordered ? ' in order' : ' OUT OF ORDER') + ' · implied total ' + money(total) + ' · recompute ' + ok + '/' + DATA.rows.length + ' within 1% · watchlist ' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + '/' + (DATA.watchlist_size ? DATA.watchlist_size : 40) + ' · ledger ' + (DATA.ledger_total ? DATA.ledger_total : 758) + '/758 · checksum ' + (DATA.checksum ? DATA.checksum : '—') + ' (FNV-1a of rank:slug:implied)'));
   })();
 
-  // ---- protocol accounting bar on the cover ----
+  // Ledger bar on the cover.
   (function () {
     var colors = ['#3fb950', '#79c0ff', '#d29922', '#8b949e', '#f85149', '#a371f7', '#ff7b72', '#e3b341', '#8b949e'];
     var bar = document.getElementById('ledger-bar-cover');
@@ -181,7 +176,7 @@
     setText('ledger-line', sum(ranked) + ' ranked (' + (ranked[0] ? ranked[0].count : 40) + ' watchlist · ' + (ranked[1] ? ranked[1].count : 158) + ' early) · ' + sum(traded) + ' token on record · ' + sum(aside) + ' set aside by the house rules — every snapshot protocol in exactly one group.');
   })();
 
-  // ---- cover evidence: value table, odds table, coefficients, peers ----
+  // Cover evidence: value/odds tables, coefficients, peers.
   (function () {
     function termByName(part) {
       var found = null;
@@ -251,6 +246,45 @@
         el('td', { text: t.note ? t.note : '' }),
       ]));
     });
+  })();
+
+  // Cover scatter, drawn live from DATA.live/DATA.rows (log scales).
+  (function () {
+    var box = document.getElementById('scatter');
+    if (!box) return;
+    var live = (DATA.live || []).filter(function (d) { return d.mcap_usd > 0 && d.tvl_usd > 0; });
+    var rows = DATA.rows.filter(function (d) { return d.tvl_usd > 0 && d.implied_value_usd > 0; });
+    var W = 352, H = 140, L = 42, R = 16, T = 4, B = 20, pw = W - L - R, ph = H - T - B;
+    var lg = function (v) { return Math.log(v) / Math.LN10; };
+    var x0 = 99, x1 = -99, y0 = 99, y1 = -99;
+    live.forEach(function (d) { x0 = Math.min(x0, lg(d.tvl_usd)); x1 = Math.max(x1, lg(d.tvl_usd)); y0 = Math.min(y0, lg(d.mcap_usd)); y1 = Math.max(y1, lg(d.mcap_usd)); });
+    rows.forEach(function (d) { x0 = Math.min(x0, lg(d.tvl_usd)); x1 = Math.max(x1, lg(d.tvl_usd)); y0 = Math.min(y0, lg(d.implied_value_usd)); y1 = Math.max(y1, lg(d.implied_value_usd)); });
+    var xLo = Math.floor(x0 - 0.1), xHi = Math.ceil(x1 + 0.1), yLo = Math.floor(y0 - 0.1), yHi = Math.ceil(y1 + 0.1);
+    var X = function (v) { return (L + (lg(v) - xLo) / (xHi - xLo) * pw).toFixed(1); };
+    var Y = function (v) { return (T + ph - (lg(v) - yLo) / (yHi - yLo) * ph).toFixed(1); };
+    var cv = function (x) { return Math.exp(M.value_const + M.value_log_tvl * Math.log(x)); };
+    var s = '', e, g, p10 = function (k) { return Math.pow(10, k); };
+    var xA = Math.ceil(xLo), xB = Math.floor(xHi), yA = Math.ceil(yLo), yB = Math.floor(yHi);
+    for (e = xA; e <= xB; e++) {
+      g = X(p10(e));
+      s += '<line class="scatter-grid" x1="' + g + '" y1="' + T + '" x2="' + g + '" y2="' + (T + ph) + '"/><text x="' + g + '" y="' + (H - 8) + '" text-anchor="' + (e === xA ? 'start' : (e === xB ? 'end' : 'middle')) + '">' + money(p10(e)) + '</text>';
+    }
+    for (e = yA; e <= yB; e++) {
+      g = Y(p10(e));
+      s += '<line class="scatter-grid" x1="' + L + '" y1="' + g + '" x2="' + (L + pw) + '" y2="' + g + '"/><text x="' + (L - 4) + '" y="' + (+g + 3) + '" text-anchor="end">' + money(p10(e)) + '</text>';
+    }
+    var hi = '', lo = '', line = '';
+    for (var i = 0; i <= 24; i++) {
+      var xv = p10(xLo + (xHi - xLo) * i / 24), cx = X(xv);
+      hi += cx + ',' + Y(cv(xv) * FIT.resid_p75_mult) + ' ';
+      lo = cx + ',' + Y(cv(xv) * FIT.resid_p25_mult) + ' ' + lo;
+      line += cx + ',' + Y(cv(xv)) + ' ';
+    }
+    var dots = '';
+    rows.forEach(function (d) { dots += '<circle class="scatter-board" cx="' + X(d.tvl_usd) + '" cy="' + Y(d.implied_value_usd) + '" r="1.8"/>'; });
+    live.forEach(function (d) { dots += '<circle class="scatter-live" cx="' + X(d.tvl_usd) + '" cy="' + Y(d.mcap_usd) + '" r="2.6"/>'; });
+    box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img">' + s + '<polygon class="scatter-band" points="' + hi + lo + '"/><polyline class="scatter-curve" points="' + line + '"/>' + dots + '</svg>';
+    setText('scatter-note', live.length + ' live comps (blue), ' + rows.length + ' board rows (green). Curve exp(' + M.value_const.toFixed(4) + ' + ' + M.value_log_tvl.toFixed(4) + ' × ln TVL); band ×' + FIT.resid_p25_mult.toFixed(2) + '–×' + FIT.resid_p75_mult.toFixed(2) + '. Board points sit below the curve: implied values after ever-odds.');
   })();
 
   // ---- category effects, ledger, live comparables ----
@@ -389,10 +423,7 @@
     else if (S.verdict !== 'all') { list.sort(function (a, b) { return b.p.nph - a.p.nph; }); S.sort = 'net'; }
     else list.sort(function (a, b) { return a.r.rank - b.r.rank; });
     var sortLabel = S.sort === 'rank' ? 'rank' : (S.sort === 'net' ? 'net/hour' : (S.sort === 'implied' ? 'implied value' : (S.sort === 'tvl' ? 'TVL' : (S.sort === 'odds' ? 'token odds' : (S.sort === 'growth' ? '7d change' : 'age')))));
-    // Category league strip, computed from the board, on filtered views:
-    // leagues with at least 3 rows in view, plus a count of the smaller ones.
-    // On a filtered view the evidence block is hidden, and the leagues
-    // render as a compact table instead of running text.
+    // Category leagues on filtered views; the evidence block hides there.
     var evidenceSec = document.getElementById('evidence-section');
     var isFilteredView = list.length > 0 && list.length !== DATA.rows.length;
     if (evidenceSec) evidenceSec.classList.toggle('view-hidden', isFilteredView);
@@ -542,7 +573,7 @@
     inner.appendChild(el('p', { class: 'sub', text: 'Rank ' + r.rank + ' of ' + DATA.rows.length + ' · rank range #' + r.rank_min + '–' + r.rank_max + ' (200 refits) · ' + (isWatchlist(r) ? 'Watchlist' : 'Early find') }));
     inner.appendChild(el('h2', { text: r.name }));
     inner.appendChild(el('p', { class: 'sub', text: catOf(r) + ' on ' + ((r.chains || []).join(', ') || 'an unnamed chain') + ' · TVL ' + money(r.tvl_usd) + ' · ' + ageFmt(r.age_days) + ' on record' }));
-    // 1. Build chain: how the implied value is built, one term per line.
+    // 1. Build chain.
     inner.appendChild(el('h3', { text: 'How ' + money(r.implied_value_usd) + ' is built' }));
     var build = el('div', { class: 'equation' });
     [
@@ -555,12 +586,11 @@
     });
     if (r.family_child) build.appendChild(el('div', null, [el('span', { text: 'Family effect' }), el('b', { text: 'parent already has a token — odds down-weighted' })]));
     inner.appendChild(build);
-    // 2. Verdict line with drop minus fees, the T-bill and the net.
+    // 2. Verdict line.
     inner.appendChild(el('div', null, [badge(v), r.guard_reason ? el('span', { class: 'guard', text: ' ' + r.guard_reason }) : null,
       el('span', { class: 'sub', text: ' Deposit $' + p.deposit.toLocaleString('en-US') + ' · gas ~$' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' · hold ' + p.hold + ' days' })]));
     inner.appendChild(el('div', { class: 'eqbar' }, [el('b', { text: 'Drop − fees ' + signed(p.dropFees) + ' − T-bill forgone ' + money2(p.tbill) + ' = net ' + signed(p.net) + ', ' + signed(p.nph) + ' an hour. ' }), document.createTextNode(p.beT !== null ? 'Pays from a $' + p.beT.toLocaleString('en-US') + ' ticket.' : 'No ticket size pays: the slice per dollar is below the T-bill rate.')]));
-    // The same row's verdict at each fixed deposit, priced live by
-    // price() and verdict() rather than printed from a stored table.
+    // Verdict by deposit, priced live by price()/verdict().
     var savedDeposit = S.deposit;
     var depositVerdicts = [1000, 5000, 10000, 25000].map(function (d) {
       S.deposit = d;
@@ -574,9 +604,7 @@
       steps.appendChild(el('li', null, [el('b', { text: s.text }), el('span', { class: 'cost', text: 'Cost: ' + s.cost + ' · Time: ' + s.time })]));
     });
     inner.appendChild(steps);
-    // 4. Week 0–12 timeline, drawn from the step times: the weekly checks
-    // fall on days 7, 14, 21 and 28 of a 30-day hold, and the claim lands
-    // on the hold's last day.
+    // 4. Week 0–12 timeline, drawn from the step times.
     inner.appendChild(el('h3', { text: 'Week 0–12 timeline' }));
     var checkCount = Math.floor(p.hold / 7);
     var checkDays = [];
@@ -590,20 +618,34 @@
     // 5. Plan totals.
     var totalFees = (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + p.tbill;
     inner.appendChild(el('p', { class: 'sub', text: 'Plan totals: ' + (r.farm_steps || []).length + ' steps over ' + p.hold + ' days · $' + p.deposit.toLocaleString('en-US') + ' deposit · $' + (hasNum(r.farm_gas_usd) ? r.farm_gas_usd : 0) + ' gas · ' + money2(totalFees) + ' fees and forgone yield · ' + p.hours.toFixed(1) + ' h of hands-on work · net ' + signed(p.net) + ' (' + signed(p.nph) + '/h).' }));
-    // 6. The record.
-    inner.appendChild(el('h3', { text: 'The record' }));
-    var rec = el('tbody');
-    [
-      ['TVL', '$' + r.tvl_usd.toLocaleString('en-US'), '7-day change', pct(r.change_7d)],
-      ['Listed', (r.listed_at ? r.listed_at : 'not listed') + ' · ' + ageFmt(r.age_days) + ' with no token', 'Category', catOf(r)],
-      ['Chains', (r.chains || []).join(', ') || 'none listed', 'Market cap', r.mcap_usd === null ? 'null — records no token' : '$' + r.mcap_usd.toLocaleString('en-US')],
-      ['Gecko id', r.gecko_id === null ? 'null — records no token' : r.gecko_id, 'Symbol', r.symbol === null ? 'null — records no token' : r.symbol],
-      ['Exit rule', 'TVL below ' + money(r.exit_tvl_usd) + ' (' + (hasNum(r.exit_drop_pct) ? r.exit_drop_pct.toFixed(2) : '—') + '% in 7 days)', 'Source', 'DefiLlama protocol index, snapshot ' + DATA.as_of],
-    ].forEach(function (row) {
-      rec.appendChild(el('tr', null, [el('td', { text: row[0] }), el('td', { text: row[1] }), el('td', { text: row[2] }), el('td', { text: row[3] })]));
+    // Detail evidence, priced live: ever-odds build, nearest
+    // priced peers, drop x deposit matrix (record table cut).
+    var t = r.odds_terms || {};
+    var ageY = ((r.age_days === null || r.age_days === undefined) ? 365 : r.age_days) / 365.25;
+    var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+    var sgn = function (v, d) { return (v >= 0 ? '+' : '') + v.toFixed(d); };
+    var oddLine = function (label, coef, feat, contrib) { return '<div>' + label + ' <b>' + sgn(coef, 3) + ' × ' + feat + ' = ' + sgn(contrib, 3) + '</b></div>'; };
+    var oddsHtml = oddLine('const', OF.const, '1', t.intercept) + oddLine('years', OF.years, ageY.toFixed(2) + 'y', t.years) + oddLine('ln(TVL/$100M)', OF.ln_tvl, Math.log(Math.max(1, r.tvl_usd) / 100000000).toFixed(2), t.ln_tvl) + oddLine('7d growth', OF.growth, ((r.change_7d === null || r.change_7d === undefined ? 0 : r.change_7d)).toFixed(2) + '%', t.growth) + oddLine('family', OF.family, r.family_child ? '1' : '0', t.family);
+    var peers = (DATA.live || []).filter(function (d) { return d.mcap_usd > 0 && d.tvl_usd > 0; }).slice().sort(function (a, b) { return Math.abs(Math.log(a.tvl_usd) - Math.log(r.tvl_usd)) - Math.abs(Math.log(b.tvl_usd) - Math.log(r.tvl_usd)); }).slice(0, 3);
+    var peerRows = '';
+    peers.forEach(function (d) { peerRows += '<tr><td>' + esc(d.name) + '</td><td class="num">' + money(d.tvl_usd) + '</td><td class="num">' + money(d.mcap_usd) + '</td><td class="num">' + (d.mcap_usd / d.tvl_usd).toFixed(2) + '×</td></tr>'; });
+    var savedD = S.deposit, savedS = S.share, curD = p.deposit, curS = S.share, mx = '';
+    [1000, 5000, 10000].forEach(function (d) {
+      mx += '<tr><td>$' + d.toLocaleString('en-US') + '</td>';
+      [0.035, 0.07, 0.14].forEach(function (sh) {
+        S.deposit = d; S.share = sh;
+        var q = price(r), w = verdict(r, q);
+        mx += '<td class="num' + (d === curD && sh === curS ? ' hot' : '') + '">' + (Math.round(sh * 1000) / 10) + '% ' + w.toUpperCase() + ' ' + signed(q.net) + '</td>';
+      });
+      mx += '</tr>';
     });
-    inner.appendChild(el('div', { class: 'table-wrap' }, [el('table', { class: 'evidence record' }, [rec])]));
-    inner.appendChild(el('p', { class: 'sub', text: 'DefiLlama records no token for it, which is not proof it has none. Claim only through the protocol’s own domain, never through a link someone sends you. This is an estimate, not a price.' }));
+    S.deposit = savedD; S.share = savedS;
+    var ev = el('div', { class: 'detail-evidence' });
+    ev.innerHTML = '<div><h3>How the ever-odds are built</h3><div class="odds-lines">' + oddsHtml + '</div><p class="sub">logit <b>' + sgn(t.logit, 3) + '</b> → p(age) ' + Math.round(t.p_age * 100) + '% → p(' + OF.ceiling_years.toFixed(2) + 'y) ' + Math.round(t.p_max * 100) + '% → ever-odds ' + Math.round(t.ever * 100) + '%.</p></div><div><h3>Nearest priced peers</h3><table class="evidence"><tbody>' + peerRows + '</tbody></table></div>';
+    inner.appendChild(ev);
+    var mxEl = el('div');
+    mxEl.innerHTML = '<h3>Drop × deposit — highlighted is the current setting</h3><table class="evidence"><tbody>' + mx + '</tbody></table>';
+    inner.appendChild(mxEl);
     page.appendChild(inner);
     page.hidden = false;
     window.scrollTo(0, 0);
@@ -649,7 +691,7 @@
   });
 
   renderBoard();
-  // Deep link: #p=<slug> opens that protocol; #d=<deposit>, #verdict=farm, #category=<name>, #q=<text>
+  // Deep link: #p=<slug>, #d=<deposit>, #verdict=, #category=, #q=.
   (function () {
     var hash = window.location.hash || '';
     var m = /[#&]p=([^&]+)/.exec(hash);

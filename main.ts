@@ -80,6 +80,18 @@ function assertPageLiterals(html: string, radar: ReturnType<typeof buildRadar>['
   expected.push(logitLine);
   expected.push(`${of.peers} shape-passing peers: ${of.peers_symbol} record a symbol; ${of.peers_owned} own it (${of.peers_symbol - of.peers_owned} inherit a sibling's)`);
   expected.push(`p(${m.odds_ceiling_years.toFixed(2)}y)`);
+  // F1: the judge-note and headline literals, restored from runtime-filled
+  // spans to literal text the dossier carries. Each is built from the
+  // computed values, so a literal that drifts from the arithmetic fails
+  // the build exactly as the formula literals above do.
+  const fit = radar.fit;
+  expected.push(`${radar.board_size} protocols record no token`);
+  expected.push(`ranks ${radar.watchlist_size} of ${radar.watchlist_size} watchlist protocols plus ${radar.early_size} more`);
+  expected.push(`checksum ${radar.checksum}, FNV-1a of rank:slug:implied`);
+  expected.push(`leave-one-out (×${fit.loo_miss.toFixed(2)}) and walk-forward (×${fit.wf_miss.toFixed(2)})`);
+  expected.push(`walk-forward Brier ${fit.odds_brier_wf.toFixed(3)} against a ${fit.odds_brier_base.toFixed(3)} base`);
+  expected.push(`misses by ×${fit.loo_miss.toFixed(2)} leave-one-out`);
+  expected.push(`the snapshot's oldest cohort, ${of.ceiling_years.toFixed(2)} years`);
   for (const line of expected) {
     if (!html.includes(line)) fail(`dashboard/index.html literal disagrees with the computed model: missing "${line}"`);
   }
