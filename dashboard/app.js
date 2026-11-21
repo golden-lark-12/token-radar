@@ -52,7 +52,7 @@
   function catOf(r) { return r.category ? r.category : 'Other'; }
   function isDefault() { return S.deposit === 'row' && S.share === 0.07 && S.horizon === 'model'; }
   function depositLabel() {
-    if (S.deposit === 'row') return 'per-row deposit';
+    if (S.deposit === 'row') return 'per-row';
     return '$' + S.deposit.toLocaleString('en-US');
   }
 
@@ -484,7 +484,7 @@
     table.appendChild(tb2);
     var fc = { farm: 0, thin: 0, skip: 0 };
     priced.forEach(function (x) { fc[x.v] = (fc[x.v] ? fc[x.v] : 0) + 1; });
-    var note = list.length + ' rows · sorted by ' + sortLabel + ' ↓ · rank range P10–P90, 200 refits · ' + fc.farm + ' farm, ' + fc.thin + ' thin, ' + fc.skip + ' skip at ' + depositLabel() + ' · FARM: odds ≥50%, net >0, ≥$20/h · SKIP: odds <30%, slice ≤gas, 7d ≤−30% · THIN: rest (FARM→THIN at 7d ≤−15%).';
+    var note = list.length + ' rows · sorted by ' + sortLabel + ' ↓ · rank range P10–P90, 200 refits · ' + fc.farm + ' farm, ' + fc.thin + ' thin, ' + fc.skip + ' skip ' + depositLabel() + ' · FARM: odds ≥50%, net >0, ≥$20/h · SKIP: odds <30%, slice ≤gas, 7d ≤−30% · THIN: rest (FARM→THIN at 7d ≤−15%).';
     if (S.verdict !== 'all') note = 'Filtered to ' + S.verdict.toUpperCase() + ' verdict · ' + note;
     setText('count', note);
     var vSel = document.getElementById('verdict');
@@ -581,7 +581,7 @@
     var shareStar = (gas + p.tbill) / (r.implied_value_usd * (p.deposit / r.tvl_usd));
     var bench = el('div', { class: 'eqbar' });
     bench.appendChild(el('b', { text: 'Benchmarks: ' }));
-    bench.appendChild(document.createTextNode('same $' + p.deposit.toLocaleString('en-US') + ' in a 4% T-bill ' + money2(p.tbill) + ' · launch drop, after fees, ' + signed(launchDrop) + ' · fees covered above ' + (p.beO !== null ? Math.round(p.beO * 100) + '%' : '—') + ' odds / ' + (shareStar * 100).toFixed(2) + '% share · exit below ' + money(r.exit_tvl_usd) + ' (' + pct(r.exit_drop_pct) + ' in 7 days).'));
+    bench.appendChild(document.createTextNode('same $' + p.deposit.toLocaleString('en-US') + ' in a 4% T-bill ' + money2(p.tbill) + ' · if launched, after fees, ' + signed(launchDrop) + ' · fees covered above ' + (p.beO !== null ? Math.round(p.beO * 100) + '%' : '—') + ' odds / ' + (shareStar * 100).toFixed(2) + '% share · exit below ' + money(r.exit_tvl_usd) + ' (' + pct(r.exit_drop_pct) + ' in 7 days).'));
     inner.appendChild(bench);
     inner.appendChild(el('h3', { text: 'Farm plan' }));
     var steps = el('ol', { class: 'steps' });
