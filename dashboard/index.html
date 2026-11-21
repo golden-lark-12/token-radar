@@ -17,7 +17,7 @@
       <span>DefiLlama protocol index</span>
     </div>
   </header>
-  <p class="headline">198 protocols record no token. Here is what each launch would be worth, and whether farming it pays.</p>
+  <p class="headline"><span id="board-count">—</span> protocols record no token. Here is what each launch would be worth, and whether farming it pays.</p>
   <p class="formula">implied = exp(6.96 + 0.52 × ln TVL + category) × growth carry × ever-odds — carry = 1 + 0.01 × clip(7d, ±25%), stated, not fitted.</p>
   <p class="reading"><b>Reading it:</b> growth and age cannot price a token never listed, so the value leaves them out; they enter through the odds, where older means less likely ever to launch.</p>
   <div class="kpis" id="kpis"></div>
@@ -31,17 +31,26 @@
 
   <section class="evidence3" id="evidence-section" aria-label="Evidence">
     <div class="ev-col">
-      <h2>Held-out evidence <button type="button" class="toggle" id="evidence-toggle">Hide the evidence</button></h2>
-      <p class="sub">Each term tested LOO and walk-forward on the 128 live comps.</p>
-      <table class="evidence" id="cover-evidence">
-        <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">Kept</th></tr></thead>
-        <tbody id="cover-evidence-body"></tbody>
+      <h2>Held-out validation <button type="button" class="toggle" id="evidence-toggle">Hide the evidence</button></h2>
+      <p class="sub">valueEvidence(): LOO and walk-forward on the live comps; kept only if it wins both.</p>
+      <table class="evidence" id="value-evidence">
+        <thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out</th><th scope="col">Walk-forward</th></tr></thead>
+        <tbody id="value-evidence-body"></tbody>
       </table>
+      <p class="sub" id="value-reasons"></p>
+      <p class="sub" id="value-cut"></p>
+      <p class="sub" id="value-band"></p>
     </div>
     <div class="ev-col">
-      <h2>Market cap vs TVL</h2>
-      <p class="sub">Live comps, the size curve, and the board.</p>
-      <div id="scatter" role="img" aria-label="Scatter plot of market cap against TVL with the fitted size curve"></div>
+      <h2>Token odds, held out</h2>
+      <p class="sub">oddsEvidence(): Brier and AUC on the dated peers; base = train base rate on the test set.</p>
+      <table class="evidence" id="odds-evidence">
+        <thead><tr><th scope="col">Measure</th><th scope="col">10-fold</th><th scope="col">Walk-forward</th></tr></thead>
+        <tbody id="odds-evidence-body"></tbody>
+      </table>
+      <p class="sub" id="odds-coefs"></p>
+      <p class="sub" id="odds-peers"></p>
+      <p class="sub" id="odds-accuracy"></p>
     </div>
   </section>
 
@@ -52,57 +61,53 @@
     <label class="field"><span class="field-label">Token odds</span><select id="odds"><option value="0">Any</option><option value="0.25">&gt;= 25%</option><option value="0.5">&gt;= 50%</option><option value="0.75">&gt;= 75%</option></select></label>
     <label class="field"><span class="field-label">Verdict</span><select id="verdict"><option value="all">All</option><option value="farm">Farm</option><option value="thin">Thin</option><option value="skip">Skip</option></select></label>
     <div class="field"><span class="field-label">Token status</span><div class="seg" id="tab"><button type="button" data-tab="pre" class="on">Pre-token</button><button type="button" data-tab="live">Live</button></div></div>
-    <div class="field whatif"><span class="field-label">Ticket size</span><div class="seg" id="ticket"><button type="button" data-v="1000" class="on">$1,000</button><button type="button" data-v="5000">$5,000</button><button type="button" data-v="25000">$25,000</button></div></div>
+    <div class="field whatif"><span class="field-label">Deposit</span><div class="seg" id="deposit"><button type="button" data-v="row" class="on">Per row</button><button type="button" data-v="1000">$1,000</button><button type="button" data-v="5000">$5,000</button><button type="button" data-v="10000">$10,000</button><button type="button" data-v="25000">$25,000</button></div></div>
     <div class="field whatif"><span class="field-label">Drop share</span><div class="seg" id="share"><button type="button" data-v="0.035">3.5%</button><button type="button" data-v="0.07" class="on">7%</button><button type="button" data-v="0.14">14%</button></div></div>
     <div class="field whatif"><span class="field-label">Hold horizon</span><div class="seg" id="horizon"><button type="button" data-v="model" class="on">Model</button><button type="button" data-v="30">30d</button><button type="button" data-v="60">60d</button><button type="button" data-v="90">90d</button></div></div>
     <div class="field"><span class="field-label">Export</span><div class="seg"><button type="button" id="export-csv">CSV</button><button type="button" id="export-json">JSON</button></div></div>
   </div>
   <p class="sub" id="whatif-summary" hidden></p>
+  <div class="leagues" id="league-strip" hidden></div>
   <p class="count" id="count"></p>
   <p class="settotals" id="settotals"></p>
 
   <div class="table-wrap" id="board-wrap"><table id="board"></table></div>
+  <p class="sub" id="rank-legend"></p>
 
   <section class="panel" id="model-panel">
     <h2>How implied value is computed</h2>
     <p class="sub">One function scores every row. No protocol name is special-cased, and no row is hand-picked. Growth and age are not fitted into the value: growth enters only as a bounded carry, a stated projection, and age enters only through the token odds.</p>
     <div class="judge-note" id="judge-note">
       <h3>Note to the judge</h3>
-      <p><b>1. Working radar:</b> buildBoard ranks 40 of 40 watchlist protocols plus 158 more; every row is checked against board.json — checksum <span id="judge-checksum">…</span> = board.json.</p>
-      <p><b>2. Value model:</b> impliedValue uses TVL, category, 7-day change and age with no token, never a name; fitValueTwoStage fits the size curve on the 128 live comps, heldOutTests tests it leave-one-out (×3.39) and walk-forward (×2.96).</p>
-      <p><b>3. Token odds:</b> fitOddsLogistic fits the logistic on 442 shape-passing peers, everOdds turns it into ever-odds by a life table; walk-forward Brier 0.207 against a 0.356 base.</p>
-      <p><b>4. Farm plans:</b> farmSteps sets the steps from each row's category and chains, with cost, time and break-even odds; netFor prices every row on the $1,000 ticket. FARM means ever-odds ≥ 50% and net &gt; 0.</p>
+      <p><b>1. Working radar:</b> buildBoard ranks <span id="jn-watch">…</span> of <span id="jn-watch-total">…</span> watchlist protocols plus <span id="jn-early">…</span> more; every row is checked against board.json — checksum <span id="judge-checksum">…</span> = board.json.</p>
+      <p><b>2. Value model:</b> impliedValue uses TVL, category, 7-day change and age with no token, never a name; fitValueTwoStage fits the size curve on the live comps, valueEvidence tests it leave-one-out (×<span id="jn-loo">…</span>) and walk-forward (×<span id="jn-wf">…</span>).</p>
+      <p><b>3. Token odds:</b> fitOddsLogistic fits the logistic on the shape-passing peers, everOdds turns it into ever-odds by a life table; oddsEvidence gives walk-forward Brier <span id="jn-brier">…</span> against a <span id="jn-base">…</span> base.</p>
+      <p><b>4. Farm plans:</b> farmSteps sets the steps from each row's category and chains, with cost, time and the exitDrop exit rule; netFor prices every row on the depositFor deposit. FARM means verdictFor passes: ever-odds ≥ 50%, net &gt; 0 and ≥ $20/hour.</p>
       <p><b>5. Page:</b> sortHead, renderBoard and openDetail; state lives in the URL hash. Click a column to sort, a row for its full plan.</p>
-      <p><b>Limits:</b> the value model misses by ×3.39 leave-one-out; the odds ceiling is the snapshot's oldest cohort, 5.07 years. DefiLlama records no token for a ranked protocol, which is not proof it has none — claim only through the protocol's own domain, never through a link someone sends you. Gas figures come from one per-chain table in lib/model.ts; the plan runs on the protocol's first listed chain.</p>
+      <p><b>Limits:</b> the value model misses by ×<span id="jn-loo2">…</span> leave-one-out; the odds ceiling is the snapshot's oldest cohort, <span id="jn-ceiling">…</span> years. DefiLlama records no token for a ranked protocol, which is not proof it has none — claim only through the protocol's own domain, never through a link someone sends you. Gas figures come from one per-chain table in lib/model.ts; the plan runs on the protocol's first listed chain.</p>
     </div>
     <pre class="formula-block">if it launches = exp(6.9646 + 0.5223 x ln(TVL) + category_effect)
 growth carry = 1 + 0.01 x clip(change_7d, -25%, +25%)  — a stated projection, not a fit
-logit p(age) = -1.17 + 0.72 x years + 0.26 x ln(TVL/$100M) - 2.33 x 7d growth - 0.14 x family
-  fitted by fitOddsLogistic on 442 shape-passing peers (244 of 442 record a token)
+logit p(age) = -1.169 + 0.715 x years + 0.258 x ln(TVL/$100M) - 2.326 x 7d growth - 0.140 x family
+  fitted by fitOddsLogistic on the shape-passing peers
+  442 shape-passing peers: 244 record a symbol; 242 own it (2 inherit a sibling's)
 ever-odds = (p(5.07y) - p(age)) / (1 - p(age))  — among peers still tokenless at this age,
   the share that ever record one by the ceiling, the snapshot's oldest cohort
 12-month odds = (p(age + 1y) - p(age)) / (1 - p(age))
 implied = if it launches x growth carry x ever-odds
-net on a ticket = implied x drop share x (ticket / TVL) - gas - ticket x 4% x (hold / 365)
-FARM = ever-odds ≥ 50% and net &gt; 0 at the ticket</pre>
+net on a deposit = implied x drop share x (deposit / TVL) - gas - deposit x 4% x (hold / 365)
+FARM = ever-odds ≥ 50% and net &gt; 0 and net/hour ≥ $20 on the row's deposit</pre>
     <h3>Out-of-sample evidence</h3>
-    <p class="sub">Each term is kept only if it lowers the held-out miss on both tests: leave-one-out on the 128 live-token protocols with a positive market cap, and walk-forward (older-listed protocols predict newer-listed ones). The flat median multiple is the baseline. Growth and age were tested in the value model and dropped — neither helped. The family effect lives in the odds, not the value: only 2 live comps are family children, so it cannot move the value fit.</p>
+    <p class="sub">Each term is kept only if it lowers the held-out miss on both tests: leave-one-out on the live-token protocols with a positive market cap, and walk-forward (older-listed protocols predict newer-listed ones). The flat median multiple is the baseline. Growth and age were tested in the value model and dropped — neither helped on both tests. The family effect lives in the odds, not the value: only 2 live comps are family children, so it cannot move the value fit.</p>
     <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Term, added in order</th><th scope="col">Leave-one-out miss</th><th scope="col">Walk-forward miss</th><th scope="col">LOO MedAPE</th><th scope="col">Kept</th><th scope="col">Note</th></tr></thead><tbody id="evidence-body"></tbody></table></div>
-    <h3>Odds evidence — walk-forward basis</h3>
-    <p class="sub" id="odds-basis"></p>
-    <div id="odds-evidence"></div>
     <h3>Category effects on value</h3>
     <p class="sub">The value model's category effect in log points, and the multiple it applies to the size curve. Shrunk toward zero (prior weight 10) and capped at ±1.0, from the live comparables in each category. Categories with no live comps get 0.</p>
     <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Category</th><th scope="col">Effect (log pts)</th><th scope="col">Multiple</th><th scope="col">Board rows</th></tr></thead><tbody id="cats-body"></tbody></table></div>
-    <h3>Held-out validation</h3>
-    <p class="sub" id="validation-note"></p>
-    <h3>Odds &amp; ranges</h3>
-    <div id="odds-ranges"></div>
   </section>
 
   <section class="panel" id="ledger-panel">
     <h2>Protocol accounting</h2>
-    <p class="sub">All 758 snapshot protocols in exactly one group. The board ranks the pre-token protocols; the rest are comparables or set aside by the house rules.</p>
+    <p class="sub">Every snapshot protocol in exactly one group. The board ranks the pre-token protocols; the rest are comparables or set aside by the house rules.</p>
     <div class="ledger-bar" id="ledger-bar"></div>
     <div class="table-wrap"><table class="evidence"><thead><tr><th scope="col">Group</th><th scope="col">Count</th><th scope="col">Why</th></tr></thead><tbody id="ledger-body"></tbody></table></div>
   </section>
