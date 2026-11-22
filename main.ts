@@ -107,6 +107,16 @@ const { board, radar } = buildRadar(snap);
 const problem = boardIssue(board, snap);
 if (problem !== null) fail(`the model wrote a board the gate refuses: ${problem}`);
 
+// Radar-13 verdict counts, fixed by the owner-approved rule: net at or
+// below zero, or a break-even that never pays, is a SKIP. FARM must
+// stay 68 and the split must land exactly 68 / 87 / 43, rank order
+// untouched. Any other split fails the build instead of shipping.
+const verdictCounts = { farm: 0, thin: 0, skip: 0 };
+for (const r of board) verdictCounts[r.verdict]++;
+if (verdictCounts.farm !== 68 || verdictCounts.thin !== 87 || verdictCounts.skip !== 43) {
+  fail(`verdict split is FARM ${verdictCounts.farm} / THIN ${verdictCounts.thin} / SKIP ${verdictCounts.skip}, not 68 / 87 / 43`);
+}
+
 const pageHtml = readFileSync(join(root, 'dashboard', 'index.html'), 'utf8');
 assertPageLiterals(pageHtml, radar);
 
@@ -114,7 +124,7 @@ mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
 writeFileSync(join(outDir, 'data.js'), dataScript(radar));
 
-copyPlainFiles(join(root, 'dashboard'), join(outDir, 'dashboard'));
+const dashFiles = copyPlainFiles(join(root, 'dashboard'), join(outDir, 'dashboard'));
 const shots = copyPlainFiles(join(root, 'screenshots'), join(outDir, 'screenshots'));
 if (shots.length < 3) fail(`screenshots/ holds ${shots.length} image${shots.length === 1 ? '' : 's'}: hand in 3, the board, a detail view and a filtered view`);
 for (const name of shots) {
@@ -129,5 +139,5 @@ writeFileSync(
 
 process.stdout.write(
   `token radar: ${snap.protocols.length} protocols, ${snap.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
-    `token radar: wrote ${join(outDir, 'board.json')}, ${join(outDir, 'data.js')}, ${join(outDir, 'dashboard')} (3 files), ${join(outDir, 'screenshots')} (${shots.length} images) and ${join(outDir, 'dossier.json')}\n`,
+    `token radar: wrote ${join(outDir, 'board.json')}, ${join(outDir, 'data.js')}, ${join(outDir, 'dashboard')} (${dashFiles.length} files), ${join(outDir, 'screenshots')} (${shots.length} images) and ${join(outDir, 'dossier.json')}\n`,
 );

@@ -104,7 +104,7 @@ export const MODEL: Consts = {
   exit_quantile: 0.05,
 };
 
-export const MODEL_VERSION = 'radar-8';
+export const MODEL_VERSION = 'radar-13';
 
 // Value effect per category, in log points: the shrunk mean of the
 // clipped least-squares residuals in the category. A lone residual
@@ -261,8 +261,6 @@ export interface FitSummary {
   within3_flat: number;
   note: string;
 }
-
-export const LIVE_ROWS = 24;
 
 export interface FitTerm {
   term: string;
@@ -427,6 +425,9 @@ export interface LiveRow {
   tvl_usd: number;
   mcap_usd: number | null;
   change_7d: number | null;
+  symbol: string | null;
+  gecko_id: string | null;
+  listed_at: string | null;
 }
 
 export interface LeagueRow {
@@ -449,6 +450,9 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
+  priced_size: number;
+  value_effects: Record<string, number>;
+  odds_beta: number[];
   fit: FitSummary;
   odds_fit: OddsEvidence;
   fit_terms: FitTerm[];
@@ -1440,13 +1444,26 @@ export function netFor(
 }
 
 /**
- * The verdict rule. FARM needs the odds, a positive net after the
- * T-bill, and at least $20 for each hour of work. SKIP when the odds
- * are low or the fees exceed the drop. Everything else is THIN. The
- * crash guard is applied on top of this, in the board assembly.
+ * The verdict rule, radar-13. SKIP first: a row whose net after the
+ * T-bill is zero or negative never pays on its own deposit, and a row
+ * whose break-even odds are null never pays either, because breaking
+ * even would need odds above the 0.95 cap. FARM needs the odds, a
+ * positive net after the T-bill, and at least $20 for each hour of
+ * work. SKIP also when the odds are low or the fees exceed the drop.
+ * Everything else is THIN. The crash guard is applied on top of this,
+ * in the board assembly.
  */
-export function verdictFor(odds: number, netUsd: number, netPerHour: number, slice: number, gas: number, m: Consts = MODEL): 'farm' | 'thin' | 'skip' {
-  if (odds >= 0.5 && netUsd > 0 && netPerHour >= m.hourly_floor_usd) return 'farm';
+export function verdictFor(
+  odds: number,
+  netUsd: number,
+  netPerHour: number,
+  slice: number,
+  gas: number,
+  m: Consts = MODEL,
+  breakEvenOdds: number | null = null,
+): 'farm' | 'thin' | 'skip' {
+  if (netUsd <= 0 || breakEvenOdds === null) return 'skip';
+  if (odds >= 0.5 && netPerHour >= m.hourly_floor_usd) return 'farm';
   if (odds < 0.3 || slice <= gas) return 'skip';
   return 'thin';
 }
@@ -1804,7 +1821,7 @@ function assembleBoard(snap: Snap, m: Consts = MODEL): Assembled {
   const radarRows: RadarRow[] = [];
   scored.forEach((s, i) => {
     const g7 = s.p.change_7d;
-    let verdict = verdictFor(s.odds, s.net.net_usd, s.net.net_per_hour_usd, s.net.slice_usd, s.gas, m);
+    let verdict = verdictFor(s.odds, s.net.net_usd, s.net.net_per_hour_usd, s.net.slice_usd, s.gas, m, s.net.break_even_odds);
     let guard: string | null = null;
     // Crash guard: a protocol shedding TVL fast is never a farm, and a
     // collapse is never anything but a skip.
@@ -1935,12 +1952,15 @@ export function buildBoard(snap: Snap, m: Consts = MODEL): BoardRow[] {
 
 // ---- dashboard payload: live comps, leagues, ledger, assembly ----
 
-/** The live-token table: top protocols by market cap, the comparables. */
+/** The live-token table: every protocol that records a symbol, all 416
+ * of them, priced or not. The 128 with a positive market cap are the
+ * fit set the value model is fitted on; the rest record a symbol with
+ * no usable cap. Sorted by market cap, then TVL, caps of zero or
+ * missing last. */
 export function liveRows(snap: Snap): LiveRow[] {
   return snap.protocols
-    .filter((p) => !isPreToken(p) && p.category !== 'CEX')
+    .filter((p) => p.symbol !== null && p.symbol !== undefined)
     .sort((a, b) => (b.mcap_usd ?? 0) - (a.mcap_usd ?? 0) || b.tvl_usd - a.tvl_usd)
-    .slice(0, LIVE_ROWS)
     .map((p) => ({
       slug: p.slug,
       name: p.name,
@@ -1949,6 +1969,9 @@ export function liveRows(snap: Snap): LiveRow[] {
       tvl_usd: p.tvl_usd,
       mcap_usd: p.mcap_usd,
       change_7d: p.change_7d,
+      symbol: p.symbol,
+      gecko_id: p.gecko_id,
+      listed_at: p.listed_at,
     }));
 }
 
@@ -2052,6 +2075,7 @@ export function buildRadar(snap: Snap, m: Consts = MODEL): { board: BoardRow[]; 
   const ledger = buildLedger(snap, boardSlugs);
   const ledgerTotal = ledger.reduce((s, g) => s + g.count, 0);
   const kids = familyChildSlugs(snap);
+  const oddsBeta = fitOddsLogistic(snap.protocols.filter(passesShape), snap.as_of, kids);
   const odds = oddsEvidence(snap, kids);
   const value = valueEvidence(snap, m);
   const fit: FitSummary = {
@@ -2113,6 +2137,9 @@ export function buildRadar(snap: Snap, m: Consts = MODEL): { board: BoardRow[]; 
     board_size: board.length,
     early_size: early,
     live_size: live.length,
+    priced_size: live.filter((r) => r.mcap_usd !== null && r.mcap_usd > 0).length,
+    value_effects: { ...VALUE_EFFECT },
+    odds_beta: oddsBeta,
     fit,
     odds_fit: odds,
     fit_terms: heldOutTests(snap, m),
