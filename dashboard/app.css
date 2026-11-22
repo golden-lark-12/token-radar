@@ -63,11 +63,11 @@ td{border-bottom:1px solid var(--border)}
 .settotals b{font-family:var(--num)}
 .table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 6px 18px rgba(0,0,0,.3)}
 #board{font-size:12px;table-layout:fixed}
-#board thead th{background:var(--surface2);position:sticky;top:0;white-space:nowrap;cursor:pointer;padding:5px 8px;overflow:hidden;text-overflow:ellipsis}
+#board thead th{background:var(--surface2);position:sticky;top:0;white-space:nowrap;cursor:pointer;padding:6px 8px;overflow:hidden;text-overflow:ellipsis}
 #board thead th .arrow{color:var(--accent);font-size:9px}
 #board tbody tr{cursor:pointer}
 #board tbody tr:hover{background:#18222d}
-#board td{padding:4px 8px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#board td{padding:5px 8px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #board td.num,#board th.num{text-align:right;font-family:var(--num);white-space:nowrap}
 #board td.name{display:flex;align-items:center}
 #board .tag{flex:none}
